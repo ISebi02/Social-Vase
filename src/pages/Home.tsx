@@ -7,22 +7,45 @@ import { useEffect, useState } from 'react';
 export function Home() {
   const navigate = useNavigate();
   const [user, setUser] = useState(auth.currentUser);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setIsInitialLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+    
+    // If already logged in, just navigate
+    if (user) {
+      navigate('/dashboard');
+      return;
+    }
+
+    setIsLoggingIn(true);
     try {
       await loginWithGoogle();
       navigate('/dashboard');
     } catch (error) {
       console.error("Login failed", error);
+      // You could add a toast or error message here
+    } finally {
+      setIsLoggingIn(false);
     }
   };
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f4]">
+        <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] text-[#0a0a0a] font-sans selection:bg-black selection:text-white">
@@ -42,9 +65,10 @@ export function Home() {
           ) : (
             <button 
               onClick={handleLogin}
-              className="px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={isLoggingIn}
+              className="px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In
+              {isLoggingIn ? 'Signing In...' : 'Sign In'}
             </button>
           )}
         </nav>
@@ -72,9 +96,14 @@ export function Home() {
               ) : (
                 <button 
                   onClick={handleLogin}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors"
+                  disabled={isLoggingIn}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Get Started Free <ArrowRight className="w-4 h-4" />
+                  {isLoggingIn ? (
+                    <>Signing In... <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div></>
+                  ) : (
+                    <>Get Started Free <ArrowRight className="w-4 h-4" /></>
+                  )}
                 </button>
               )}
             </div>
