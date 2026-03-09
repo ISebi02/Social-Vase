@@ -9,14 +9,19 @@ export function Home() {
   const [user, setUser] = useState(auth.currentUser);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsInitialLoading(false);
+      // If user is already logged in, redirect to dashboard
+      if (currentUser) {
+        navigate('/dashboard');
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
@@ -30,10 +35,16 @@ export function Home() {
     setIsLoggingIn(true);
     try {
       await loginWithGoogle();
-      navigate('/dashboard');
-    } catch (error) {
-      console.error("Login failed", error);
-      // You could add a toast or error message here
+      // Navigation is handled by onAuthStateChanged for better reliability
+    } catch (err: any) {
+      console.error("Login failed", err);
+      if (err.code === 'auth/popup-blocked') {
+        setError('The sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        // User closed the popup, no need to show an error
+      } else {
+        setError('An error occurred during sign-in. Please try again.');
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -73,6 +84,17 @@ export function Home() {
           )}
         </nav>
       </header>
+
+      {error && (
+        <div className="bg-red-50 border-b border-red-100 px-6 py-3">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+              <Sparkles className="w-4 h-4 rotate-45" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <main className="max-w-6xl mx-auto px-6 py-24 md:py-32">
