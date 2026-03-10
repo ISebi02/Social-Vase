@@ -29,7 +29,12 @@ async function startServer() {
       case 'linkedin':
         authUrl = `https://www.linkedin.com/oauth/v2/authorization?client_id=${process.env.LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=w_member_social`;
         break;
-      // Add other platforms...
+      case 'facebook':
+        authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.META_APP_ID || process.env.FACEBOOK_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_manage_posts,pages_read_engagement`;
+        break;
+      case 'instagram':
+        authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.META_APP_ID || process.env.INSTAGRAM_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement`;
+        break;
     }
     res.json({ url: authUrl });
   });

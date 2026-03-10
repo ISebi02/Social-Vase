@@ -351,7 +351,7 @@ export function BrandSetup() {
         <div className="space-y-4">
           <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Connected Accounts</h2>
           <div className="flex gap-2">
-            {['twitter', 'linkedin'].map(platform => (
+            {['twitter', 'linkedin', 'facebook', 'instagram'].map(platform => (
               <button
                 key={platform}
                 onClick={async () => {

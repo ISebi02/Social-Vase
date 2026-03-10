@@ -24,6 +24,7 @@ export function ContentGenerator() {
   const [generatedMediaUrl, setGeneratedMediaUrl] = useState('');
   
   const [scheduling, setScheduling] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [fetchingSuggestions, setFetchingSuggestions] = useState(false);
   const [trendSearchQuery, setTrendSearchQuery] = useState('');
@@ -62,37 +63,104 @@ export function ContentGenerator() {
         ? `specifically related to "${query}"` 
         : `relevant for a brand in the ${brandData.industry || 'general'} industry and ${brandData.category || 'business'} category`;
       
-      const prompt = `Using Google Search Trends, identify 5 current trending topics, news stories, or viral discussions ${searchContext}.
+      const prompt = `Using Google Search, identify 5 current trending topics, news stories, or viral discussions ${searchContext} that would be perfect for social media content.
       
       Brand Context:
       - Name: ${brandData.name}
       - Industry: ${brandData.industry || 'N/A'}
       - Category: ${brandData.category || 'N/A'}
-      - Tone: ${brandData.brandTone}
-      - Personality: ${brandData.brandPersonality}
       
-      For each topic, provide a catchy title and a brief explanation of why it's trending and how it relates to this brand.
+      For each topic, provide:
+      1. A catchy title.
+      2. A brief explanation of why it's trending and how it relates to this brand.
+      3. The type (trend, news, or holiday).
       
-      Return a JSON array of objects:
-      [
-        { "title": "Topic Title", "description": "Context and relevance", "type": "trend" | "news" | "holiday" }
-      ]`;
+      IMPORTANT: Return ONLY a valid JSON array of objects. Do not include any markdown formatting or extra text.
+      Format: [{"title": "...", "description": "...", "type": "..."}]`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json'
+          tools: [{ googleSearch: {} }]
         }
       });
 
-      const result = JSON.parse(response.text || '[]');
+      const text = response.text || '[]';
+      const cleanJson = text.replace(/```json|```/g, '').trim();
+      const result = JSON.parse(cleanJson);
       setSuggestions(result);
     } catch (error) {
       console.error("Error fetching suggestions:", error);
+      setSuggestions([]);
     } finally {
       setFetchingSuggestions(false);
+    }
+  };
+
+  const handlePlanCalendar = async (days: number) => {
+    if (!brand) return;
+    setPlanning(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Act as a strategic social media manager. Create a ${days}-day content calendar for the following brand.
+      
+      Brand Context:
+      - Name: ${brand.name}
+      - Industry: ${brand.industry || 'N/A'}
+      - Category: ${brand.category || 'N/A'}
+      - Tone: ${brand.brandTone}
+      - Personality: ${brand.brandPersonality}
+      
+      Instructions:
+      1. Use Google Search to find current trends, upcoming holidays, and industry-specific topics for the next ${days} days.
+      2. For each day, provide a content topic and a brief description of the post.
+      3. Distribute the topics logically over the ${days} days.
+      
+      IMPORTANT: Return ONLY a valid JSON array of objects. Do not include markdown.
+      Format: [{"day": 1, "topic": "...", "description": "...", "type": "..."}]`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
+      });
+
+      const text = response.text || '[]';
+      const cleanJson = text.replace(/```json|```/g, '').trim();
+      const plan = JSON.parse(cleanJson);
+
+      // Save each planned post to Firestore
+      const batch = plan.map(async (item: any, index: number) => {
+        const scheduledDate = new Date();
+        scheduledDate.setDate(scheduledDate.getDate() + (index + 1));
+        scheduledDate.setHours(10, 0, 0, 0);
+
+        return addDoc(collection(db, 'posts'), {
+          userId: auth.currentUser?.uid,
+          brandId: brand.id,
+          content: `${item.topic}\n\n${item.description}`,
+          status: 'suggested',
+          scheduledTime: scheduledDate,
+          platforms: selectedPlatforms,
+          mediaType: 'none',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          isPlanned: true
+        });
+      });
+
+      await Promise.all(batch);
+      alert(`Successfully planned a ${days}-day calendar! You can review the suggestions in the Scheduler.`);
+      navigate('/schedule');
+    } catch (error) {
+      console.error("Planning failed:", error);
+      alert("Failed to plan calendar. Please try again.");
+    } finally {
+      setPlanning(false);
     }
   };
 
@@ -317,6 +385,23 @@ export function ContentGenerator() {
             >
               <RefreshCw className={cn("w-3 h-3", fetchingSuggestions && "animate-spin")} />
               {trendSearchQuery ? 'Search' : 'Refresh'}
+            </button>
+            <div className="h-6 w-px bg-gray-200 mx-1"></div>
+            <button 
+              onClick={() => handlePlanCalendar(7)}
+              disabled={planning}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+            >
+              {planning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Calendar className="w-3 h-3" />}
+              Plan Week
+            </button>
+            <button 
+              onClick={() => handlePlanCalendar(30)}
+              disabled={planning}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+            >
+              {planning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Calendar className="w-3 h-3" />}
+              Plan Month
             </button>
           </div>
         </div>
