@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, limit } from 'firebase/firestore';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, limit, getDocFromServer } from 'firebase/firestore';
 import { GoogleGenAI, Type } from '@google/genai';
 import { Loader2, UploadCloud, Link as LinkIcon, Check, Plus, X, Image as ImageIcon } from 'lucide-react';
 
@@ -31,6 +31,18 @@ export function BrandSetup() {
   const [periodUnit, setPeriodUnit] = useState<'day' | 'week' | 'month'>('day');
 
   useEffect(() => {
+    // Test connection to Firestore as required by instructions
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    };
+    testConnection();
+
     const fetchBrand = async () => {
       if (!auth.currentUser) return;
       try {
@@ -168,23 +180,39 @@ export function BrandSetup() {
       if (analysisResult?.brandTone) brandData.brandTone = analysisResult?.brandTone;
       if (analysisResult?.brandPersonality) brandData.brandPersonality = analysisResult?.brandPersonality;
 
-
       if (brand) {
-        await updateDoc(doc(db, 'brands', brand.id), brandData);
+        try {
+          await updateDoc(doc(db, 'brands', brand.id), brandData);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.UPDATE, `brands/${brand.id}`);
+        }
       } else {
-        await addDoc(collection(db, 'brands'), {
-          ...brandData,
-          createdAt: serverTimestamp()
-        });
+        try {
+          await addDoc(collection(db, 'brands'), {
+            ...brandData,
+            createdAt: serverTimestamp()
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, 'brands');
+        }
       }
       
       setSaved(true);
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving brand:", error);
-      alert("Failed to save brand.");
+      let errorMessage = "Failed to save brand.";
+      try {
+        const parsedError = JSON.parse(error.message);
+        if (parsedError.error.includes("insufficient permissions")) {
+          errorMessage = "Permission denied. Please ensure your brand data is valid and you have access.";
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+      alert(errorMessage);
     } finally {
       setSaving(false);
     }

@@ -87,17 +87,17 @@ service cloud.firestore {
              (!('suggestedTopics' in data) || (data.suggestedTopics is list && data.suggestedTopics.size() <= 100)) &&
              (!('industry' in data) || (data.industry is string && data.industry.size() <= 200)) &&
              (!('category' in data) || (data.category is string && data.category.size() <= 200)) &&
-             (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 1000)) &&
+             (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 1000000)) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
              data.updatedAt is timestamp;
     }
 
     function isValidPost(data) {
-      return hasOnlyAllowedFields(['userId', 'brandId', 'content', 'mediaUrl', 'mediaType', 'scheduledTime', 'status', 'platforms', 'likes', 'shares', 'comments', 'impressions', 'reach', 'createdAt', 'updatedAt']) &&
+      return hasOnlyAllowedFields(['userId', 'brandId', 'content', 'mediaUrl', 'mediaType', 'scheduledTime', 'status', 'platforms', 'likes', 'shares', 'comments', 'impressions', 'reach', 'createdAt', 'updatedAt', 'isPlanned']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.brandId is string && data.brandId.size() > 0 && data.brandId.size() < 100 &&
              data.content is string && data.content.size() <= 10000 &&
-             (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 1000)) &&
+             (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 1000000)) &&
              (!('mediaType' in data) || (data.mediaType in ['image', 'video', 'none'])) &&
              (!('scheduledTime' in data) || data.scheduledTime is timestamp) &&
              data.status in ['draft', 'scheduled', 'published', 'failed', 'suggested'] &&
@@ -107,6 +107,7 @@ service cloud.firestore {
              (!('comments' in data) || data.comments is int) &&
              (!('impressions' in data) || data.impressions is int) &&
              (!('reach' in data) || data.reach is int) &&
+             (!('isPlanned' in data) || data.isPlanned is bool) &&
              data.createdAt is timestamp &&
              data.updatedAt is timestamp;
     }

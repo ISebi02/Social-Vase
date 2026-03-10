@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Calendar, Clock, Trash2, Image as ImageIcon, Video, Type as TypeIcon, CheckCircle2 } from 'lucide-react';
@@ -38,8 +38,7 @@ export function Scheduler() {
       await deleteDoc(doc(db, 'posts', id));
       setPosts(posts.filter(p => p.id !== id));
     } catch (error) {
-      console.error("Error deleting post:", error);
-      alert("Failed to delete post.");
+      handleFirestoreError(error, OperationType.DELETE, `posts/${id}`);
     }
   };
 
@@ -52,8 +51,7 @@ export function Scheduler() {
       setPosts(posts.map(p => p.id === id ? { ...p, status: 'scheduled' } : p));
       alert("Post approved and scheduled!");
     } catch (error) {
-      console.error("Error approving post:", error);
-      alert("Failed to approve post.");
+      handleFirestoreError(error, OperationType.UPDATE, `posts/${id}`);
     }
   };
 
@@ -67,8 +65,7 @@ export function Scheduler() {
       setEditingPostId(null);
       alert("Post updated successfully!");
     } catch (error) {
-      console.error("Error updating post:", error);
-      alert("Failed to update post.");
+      handleFirestoreError(error, OperationType.UPDATE, `posts/${id}`);
     }
   };
 

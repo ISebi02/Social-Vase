@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { GoogleGenAI } from '@google/genai';
 import { Loader2, Image as ImageIcon, Video, Type as TypeIcon, Calendar, PenTool, Sparkles, TrendingUp, PartyPopper, RefreshCw, Twitter, Linkedin, Instagram, Facebook } from 'lucide-react';
@@ -75,7 +75,7 @@ export function ContentGenerator() {
       2. A brief explanation of why it's trending and how it relates to this brand.
       3. The type (trend, news, or holiday).
       
-      IMPORTANT: Return ONLY a valid JSON array of objects. Do not include any markdown formatting or extra text.
+      IMPORTANT: Return ONLY a valid JSON array of objects.
       Format: [{"title": "...", "description": "...", "type": "..."}]`;
 
       const response = await ai.models.generateContent({
@@ -87,9 +87,17 @@ export function ContentGenerator() {
       });
 
       const text = response.text || '[]';
-      const cleanJson = text.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(cleanJson);
-      setSuggestions(result);
+      // More robust JSON extraction
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      const cleanJson = jsonMatch ? jsonMatch[0] : '[]';
+      
+      try {
+        const result = JSON.parse(cleanJson);
+        setSuggestions(Array.isArray(result) ? result : []);
+      } catch (e) {
+        console.error("Failed to parse suggestions JSON:", text);
+        setSuggestions([]);
+      }
     } catch (error) {
       console.error("Error fetching suggestions:", error);
       setSuggestions([]);
@@ -118,11 +126,11 @@ export function ContentGenerator() {
       2. For each day, provide a content topic and a brief description of the post.
       3. Distribute the topics logically over the ${days} days.
       
-      IMPORTANT: Return ONLY a valid JSON array of objects. Do not include markdown.
+      IMPORTANT: Return ONLY a valid JSON array of objects.
       Format: [{"day": 1, "topic": "...", "description": "...", "type": "..."}]`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.1-pro-preview', // Use Pro for complex planning
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }]
@@ -130,8 +138,20 @@ export function ContentGenerator() {
       });
 
       const text = response.text || '[]';
-      const cleanJson = text.replace(/```json|```/g, '').trim();
-      const plan = JSON.parse(cleanJson);
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      const cleanJson = jsonMatch ? jsonMatch[0] : '[]';
+      
+      let plan = [];
+      try {
+        plan = JSON.parse(cleanJson);
+      } catch (e) {
+        console.error("Failed to parse calendar plan JSON:", text);
+        throw new Error("The AI returned an invalid plan format. Please try again.");
+      }
+
+      if (!Array.isArray(plan) || plan.length === 0) {
+        throw new Error("No plan was generated. Please try again.");
+      }
 
       // Save each planned post to Firestore
       const batch = plan.map(async (item: any, index: number) => {
@@ -139,26 +159,30 @@ export function ContentGenerator() {
         scheduledDate.setDate(scheduledDate.getDate() + (index + 1));
         scheduledDate.setHours(10, 0, 0, 0);
 
-        return addDoc(collection(db, 'posts'), {
-          userId: auth.currentUser?.uid,
-          brandId: brand.id,
-          content: `${item.topic}\n\n${item.description}`,
-          status: 'suggested',
-          scheduledTime: scheduledDate,
-          platforms: selectedPlatforms,
-          mediaType: 'none',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          isPlanned: true
-        });
+        try {
+          return await addDoc(collection(db, 'posts'), {
+            userId: auth.currentUser?.uid,
+            brandId: brand.id,
+            content: `${item.topic}\n\n${item.description}`,
+            status: 'suggested',
+            scheduledTime: scheduledDate,
+            platforms: selectedPlatforms,
+            mediaType: 'none',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            isPlanned: true
+          });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, 'posts');
+        }
       });
 
       await Promise.all(batch);
       alert(`Successfully planned a ${days}-day calendar! You can review the suggestions in the Scheduler.`);
       navigate('/schedule');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Planning failed:", error);
-      alert("Failed to plan calendar. Please try again.");
+      alert(error.message || "Failed to plan calendar. Please try again.");
     } finally {
       setPlanning(false);
     }
@@ -309,18 +333,22 @@ export function ContentGenerator() {
 
       const status = brand.automationSettings?.mode === 'auto' ? 'scheduled' : 'suggested';
 
-      await addDoc(collection(db, 'posts'), {
-        userId: auth.currentUser?.uid,
-        brandId: brand.id,
-        content: generatedContent,
-        mediaUrl: generatedMediaUrl || null,
-        mediaType: mediaType,
-        scheduledTime: tomorrow,
-        status: status,
-        platforms: selectedPlatforms,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      try {
+        await addDoc(collection(db, 'posts'), {
+          userId: auth.currentUser?.uid,
+          brandId: brand.id,
+          content: generatedContent,
+          mediaUrl: generatedMediaUrl || null,
+          mediaType: mediaType,
+          scheduledTime: tomorrow,
+          status: status,
+          platforms: selectedPlatforms,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, 'posts');
+      }
 
       alert(status === 'scheduled' ? "Post scheduled successfully!" : "Post saved as suggestion for approval.");
       navigate('/schedule');
