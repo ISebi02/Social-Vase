@@ -67,7 +67,7 @@ service cloud.firestore {
     }
 
     function isValidBrand(data) {
-      return hasOnlyAllowedFields(['userId', 'name', 'websiteUrl', 'socialUrls', 'guidelinesText', 'brandTone', 'brandPersonality', 'brandColors', 'automationSettings', 'clientInquiries', 'suggestedTopics', 'createdAt', 'updatedAt']) &&
+      return hasOnlyAllowedFields(['userId', 'name', 'websiteUrl', 'socialUrls', 'guidelinesText', 'brandTone', 'brandPersonality', 'brandColors', 'automationSettings', 'clientInquiries', 'suggestedTopics', 'createdAt', 'updatedAt', 'industry', 'category', 'logoUrl']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              (!('websiteUrl' in data) || (data.websiteUrl is string && data.websiteUrl.size() <= 1000)) &&
@@ -85,7 +85,10 @@ service cloud.firestore {
              )) &&
              (!('clientInquiries' in data) || (data.clientInquiries is list && data.clientInquiries.size() <= 100)) &&
              (!('suggestedTopics' in data) || (data.suggestedTopics is list && data.suggestedTopics.size() <= 100)) &&
-             data.createdAt is timestamp &&
+             (!('industry' in data) || (data.industry is string && data.industry.size() <= 200)) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 200)) &&
+             (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 1000)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
              data.updatedAt is timestamp;
     }
 

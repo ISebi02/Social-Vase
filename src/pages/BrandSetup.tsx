@@ -147,17 +147,12 @@ export function BrandSetup() {
     }
     setSaving(true);
     try {
-      const brandData = {
+      const brandData: any = {
         userId: auth.currentUser?.uid,
         name,
         websiteUrl,
         socialUrls: socialUrls.split(',').map(s => s.trim()).filter(Boolean),
         guidelinesText,
-        industry: analysisResult?.industry || industry || null,
-        category: analysisResult?.category || category || null,
-        logoUrl,
-        brandTone: analysisResult?.brandTone || null,
-        brandPersonality: analysisResult?.brandPersonality || null,
         brandColors: brandColors,
         automationSettings: {
           mode: automationMode,
@@ -166,6 +161,13 @@ export function BrandSetup() {
         },
         updatedAt: serverTimestamp()
       };
+
+      if (analysisResult?.industry || industry) brandData.industry = analysisResult?.industry || industry;
+      if (analysisResult?.category || category) brandData.category = analysisResult?.category || category;
+      if (logoUrl) brandData.logoUrl = logoUrl;
+      if (analysisResult?.brandTone) brandData.brandTone = analysisResult?.brandTone;
+      if (analysisResult?.brandPersonality) brandData.brandPersonality = analysisResult?.brandPersonality;
+
 
       if (brand) {
         await updateDoc(doc(db, 'brands', brand.id), brandData);
