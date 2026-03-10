@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { GoogleGenAI } from '@google/genai';
-import { Loader2, Image as ImageIcon, Video, Type as TypeIcon, Calendar, PenTool, Sparkles, TrendingUp, PartyPopper, RefreshCw } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Video, Type as TypeIcon, Calendar, PenTool, Sparkles, TrendingUp, PartyPopper, RefreshCw, Twitter, Linkedin, Instagram, Facebook } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -12,6 +12,11 @@ export function ContentGenerator() {
   
   const [topic, setTopic] = useState('');
   const [mediaType, setMediaType] = useState<'none' | 'image' | 'video'>('none');
+  const [aspectRatio, setAspectRatio] = useState('1:1');
+  const [quality, setQuality] = useState('1K');
+  const [videoResolution, setVideoResolution] = useState('720p');
+  
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['twitter', 'linkedin']);
   
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState('');
@@ -53,12 +58,16 @@ export function ContentGenerator() {
     setFetchingSuggestions(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const searchContext = query ? `specifically related to "${query}"` : `relevant for a brand in the ${brandData.brandTone} niche`;
+      const searchContext = query 
+        ? `specifically related to "${query}"` 
+        : `relevant for a brand in the ${brandData.industry || 'general'} industry and ${brandData.category || 'business'} category`;
       
       const prompt = `Using Google Search Trends, identify 5 current trending topics, news stories, or viral discussions ${searchContext}.
       
       Brand Context:
       - Name: ${brandData.name}
+      - Industry: ${brandData.industry || 'N/A'}
+      - Category: ${brandData.category || 'N/A'}
       - Tone: ${brandData.brandTone}
       - Personality: ${brandData.brandPersonality}
       
@@ -108,14 +117,18 @@ export function ContentGenerator() {
       // Generate Text Content with Grounding if it's a trend
       const textPrompt = `You are an expert social media manager. Write a highly engaging, humanized social media post about "${finalTopic}".
       
+      Tailor the content specifically for the following platforms: ${selectedPlatforms.join(', ')}.
+      
       ${isTrend ? 'This is a trending topic. Use Google Search to find the latest details, facts, or sentiment about this topic to ensure the post is accurate and timely.' : ''}
       
       Brand Context:
       - Name: ${brand.name}
+      - Industry: ${brand.industry || 'N/A'}
+      - Category: ${brand.category || 'N/A'}
       - Tone: ${brand.brandTone || 'Professional but approachable'}
       - Personality: ${brand.brandPersonality || 'Helpful and innovative'}
       
-      The post should NOT sound like AI. Make it relatable, use appropriate spacing, and include 2-3 relevant hashtags.`;
+      The post should NOT sound like AI. Make it relatable, use appropriate spacing, and include relevant hashtags for each platform. If multiple platforms are selected, provide a single cohesive post that works well across all of them or slightly varied versions if necessary.`;
 
       const textResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -130,16 +143,51 @@ export function ContentGenerator() {
         const imagePrompt = `A high-quality, professional social media graphic for a brand named ${brand.name}. Topic: ${finalTopic}. Brand colors: ${brand.brandColors?.join(', ') || 'neutral'}. Style: Modern, clean, relatable, no text overlays.`;
         
         const imageResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-3.1-flash-image-preview',
           contents: { parts: [{ text: imagePrompt }] },
           config: {
-            imageConfig: { aspectRatio: "1:1", imageSize: "1K" }
+            imageConfig: { 
+              aspectRatio: aspectRatio as any, 
+              imageSize: quality as any 
+            }
           }
         });
 
         for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
           if (part.inlineData) {
-            setGeneratedMediaUrl(`data:image/png;base64,${part.inlineData.data}`);
+            const base64Image = `data:image/png;base64,${part.inlineData.data}`;
+            
+            if (brand.logoUrl) {
+              // Overlay logo using Canvas
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              const img = new Image();
+              const logo = new Image();
+              
+              await new Promise((resolve) => {
+                img.onload = resolve;
+                img.src = base64Image;
+              });
+              
+              await new Promise((resolve) => {
+                logo.onload = resolve;
+                logo.src = brand.logoUrl;
+              });
+              
+              canvas.width = img.width;
+              canvas.height = img.height;
+              ctx?.drawImage(img, 0, 0);
+              
+              // Draw logo in bottom right corner
+              const logoWidth = canvas.width * 0.15; // 15% of image width
+              const logoHeight = (logo.height / logo.width) * logoWidth;
+              const padding = 20;
+              ctx?.drawImage(logo, canvas.width - logoWidth - padding, canvas.height - logoHeight - padding, logoWidth, logoHeight);
+              
+              setGeneratedMediaUrl(canvas.toDataURL('image/png'));
+            } else {
+              setGeneratedMediaUrl(base64Image);
+            }
             break;
           }
         }
@@ -151,8 +199,8 @@ export function ContentGenerator() {
           prompt: videoPrompt,
           config: {
             numberOfVideos: 1,
-            resolution: '720p',
-            aspectRatio: '16:9'
+            resolution: videoResolution as any,
+            aspectRatio: aspectRatio === '16:9' || aspectRatio === '9:16' ? aspectRatio : '16:9'
           }
         });
 
@@ -201,7 +249,7 @@ export function ContentGenerator() {
         mediaType: mediaType,
         scheduledTime: tomorrow,
         status: status,
-        platforms: ['twitter', 'linkedin'], // Default mock platforms
+        platforms: selectedPlatforms,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -214,6 +262,14 @@ export function ContentGenerator() {
     } finally {
       setScheduling(false);
     }
+  };
+
+  const togglePlatform = (platform: string) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(platform) 
+        ? prev.filter(p => p !== platform) 
+        : [...prev, platform]
+    );
   };
 
   if (loading) return <div className="p-8">Loading...</div>;
@@ -321,6 +377,32 @@ export function ContentGenerator() {
           </div>
 
           <div className="space-y-3">
+            <label className="text-sm font-medium text-gray-700">Target Platforms</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'twitter', name: 'Twitter', icon: Twitter },
+                { id: 'linkedin', name: 'LinkedIn', icon: Linkedin },
+                { id: 'instagram', name: 'Instagram', icon: Instagram },
+                { id: 'facebook', name: 'Facebook', icon: Facebook },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => togglePlatform(p.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all",
+                    selectedPlatforms.includes(p.id)
+                      ? "bg-black text-white border-black"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                  )}
+                >
+                  <p.icon className="w-3.5 h-3.5" />
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
             <label className="text-sm font-medium text-gray-700">Include Media?</label>
             <div className="grid grid-cols-3 gap-3">
               <button
@@ -346,6 +428,60 @@ export function ContentGenerator() {
               </button>
             </div>
           </div>
+
+          {mediaType !== 'none' && (
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aspect Ratio</label>
+                  <select 
+                    value={aspectRatio}
+                    onChange={(e) => setAspectRatio(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none bg-white"
+                  >
+                    {mediaType === 'image' ? (
+                      <>
+                        <option value="1:1">Square (1:1)</option>
+                        <option value="4:3">Standard (4:3)</option>
+                        <option value="3:4">Portrait (3:4)</option>
+                        <option value="16:9">Widescreen (16:9)</option>
+                        <option value="9:16">Story (9:16)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="16:9">Widescreen (16:9)</option>
+                        <option value="9:16">Story (9:16)</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Quality</label>
+                  {mediaType === 'image' ? (
+                    <select 
+                      value={quality}
+                      onChange={(e) => setQuality(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none bg-white"
+                    >
+                      <option value="512px">Standard (512px)</option>
+                      <option value="1K">High (1K)</option>
+                      <option value="2K">Ultra (2K)</option>
+                      <option value="4K">Max (4K)</option>
+                    </select>
+                  ) : (
+                    <select 
+                      value={videoResolution}
+                      onChange={(e) => setVideoResolution(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none bg-white"
+                    >
+                      <option value="720p">HD (720p)</option>
+                      <option value="1080p">Full HD (1080p)</option>
+                    </select>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={() => handleGenerate()}

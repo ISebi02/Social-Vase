@@ -64,9 +64,24 @@ export function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Brand Summary Card */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm md:col-span-1">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Active Brand</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Brand</h3>
+              {brand.logoUrl && (
+                <img src={brand.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+              )}
+            </div>
             <div className="text-xl md:text-2xl font-semibold mb-2">{brand.name}</div>
             <div className="space-y-4 mt-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Industry</div>
+                  <div className="text-sm font-medium">{brand.industry || 'Not set'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Category</div>
+                  <div className="text-sm font-medium">{brand.category || 'Not set'}</div>
+                </div>
+              </div>
               <div>
                 <div className="text-xs text-gray-500 mb-1">Tone</div>
                 <div className="text-sm font-medium">{brand.brandTone || 'Not set'}</div>

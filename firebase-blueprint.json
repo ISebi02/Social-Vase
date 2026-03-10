@@ -25,6 +25,9 @@
         "guidelinesText": { "type": "string", "description": "Extracted or uploaded brand guidelines text." },
         "brandTone": { "type": "string", "description": "AI-generated brand tone." },
         "brandPersonality": { "type": "string", "description": "AI-generated brand personality." },
+        "industry": { "type": "string", "description": "The industry the business belongs to." },
+        "category": { "type": "string", "description": "The specific category of the business." },
+        "logoUrl": { "type": "string", "description": "URL or base64 data of the brand logo." },
         "brandColors": { "type": "array", "items": { "type": "string" }, "description": "AI-extracted brand colors (hex codes)." },
         "automationSettings": {
           "type": "object",
@@ -33,20 +36,6 @@
             "postsPerPeriod": { "type": "integer", "description": "Number of posts to make in the selected period." },
             "periodUnit": { "type": "string", "enum": ["day", "week", "month"], "description": "The unit of time for the frequency (day, week, month)." }
           }
-        },
-        "clientInquiries": { "type": "array", "items": { "type": "string" }, "description": "Common questions or search terms from clients." },
-        "suggestedTopics": { 
-          "type": "array", 
-          "items": { 
-            "type": "object",
-            "properties": {
-              "title": { "type": "string" },
-              "description": { "type": "string" },
-              "source": { "type": "string", "enum": ["inquiry", "search", "trend"] },
-              "createdAt": { "type": "timestamp" }
-            }
-          },
-          "description": "AI-generated content topics based on client inquiries and search trends."
         },
         "createdAt": { "type": "timestamp", "description": "When the brand profile was created." },
         "updatedAt": { "type": "timestamp", "description": "When the brand profile was last updated." }

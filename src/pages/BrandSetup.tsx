@@ -1,22 +1,30 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, limit } from 'firebase/firestore';
 import { GoogleGenAI, Type } from '@google/genai';
-import { Loader2, UploadCloud, Link as LinkIcon } from 'lucide-react';
+import { Loader2, UploadCloud, Link as LinkIcon, Check, Plus, X, Image as ImageIcon } from 'lucide-react';
 
 export function BrandSetup() {
+  const navigate = useNavigate();
   const [brand, setBrand] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   
   const [name, setName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [guidelinesText, setGuidelinesText] = useState('');
   const [socialUrls, setSocialUrls] = useState('');
-  const [clientInquiries, setClientInquiries] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [brandColors, setBrandColors] = useState<string[]>([]);
+  const [newColor, setNewColor] = useState('#000000');
 
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  
+  const [industry, setIndustry] = useState('');
+  const [category, setCategory] = useState('');
   
   const [automationMode, setAutomationMode] = useState<'manual' | 'auto'>('manual');
   const [postsPerPeriod, setPostsPerPeriod] = useState(1);
@@ -39,7 +47,8 @@ export function BrandSetup() {
           setWebsiteUrl(data.websiteUrl || '');
           setGuidelinesText(data.guidelinesText || '');
           setSocialUrls(data.socialUrls ? data.socialUrls.join(', ') : '');
-          setClientInquiries(data.clientInquiries ? data.clientInquiries.join('\n') : '');
+          setLogoUrl(data.logoUrl || '');
+          setBrandColors(data.brandColors || []);
           
           if (data.automationSettings) {
             setAutomationMode(data.automationSettings.mode || 'manual');
@@ -51,8 +60,12 @@ export function BrandSetup() {
             setAnalysisResult({
               brandTone: data.brandTone,
               brandPersonality: data.brandPersonality,
-              brandColors: data.brandColors
+              brandColors: data.brandColors,
+              industry: data.industry,
+              category: data.category
             });
+            setIndustry(data.industry || '');
+            setCategory(data.category || '');
           }
         }
       } catch (error) {
@@ -74,12 +87,14 @@ export function BrandSetup() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
-      const prompt = `Analyze the following brand information to determine its tone, personality, and primary colors (in hex format).
+      const prompt = `Analyze the following brand information to determine its industry, business category, tone, personality, and primary colors (in hex format).
       
       Brand Guidelines/Text: ${guidelinesText}
       
       Return a JSON object with the following structure:
       {
+        "industry": "The broad industry (e.g., Technology, Healthcare, Fashion).",
+        "category": "The specific business category (e.g., SaaS, E-commerce, Personal Training).",
         "brandTone": "A short description of the brand's tone of voice (e.g., Professional, Witty, Empathetic).",
         "brandPersonality": "A short description of the brand's personality traits.",
         "brandColors": ["#FFFFFF", "#000000"]
@@ -90,11 +105,13 @@ export function BrandSetup() {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            industry: { type: Type.STRING },
+            category: { type: Type.STRING },
             brandTone: { type: Type.STRING },
             brandPersonality: { type: Type.STRING },
             brandColors: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ['brandTone', 'brandPersonality', 'brandColors']
+          required: ['industry', 'category', 'brandTone', 'brandPersonality', 'brandColors']
         }
       };
 
@@ -112,6 +129,9 @@ export function BrandSetup() {
 
       const result = JSON.parse(response.text || '{}');
       setAnalysisResult(result);
+      if (result.industry) setIndustry(result.industry);
+      if (result.category) setCategory(result.category);
+      if (result.brandColors) setBrandColors(result.brandColors);
     } catch (error) {
       console.error("Analysis failed:", error);
       alert("Failed to analyze brand. Please try again.");
@@ -133,10 +153,12 @@ export function BrandSetup() {
         websiteUrl,
         socialUrls: socialUrls.split(',').map(s => s.trim()).filter(Boolean),
         guidelinesText,
-        clientInquiries: clientInquiries.split('\n').map(s => s.trim()).filter(Boolean),
+        industry: analysisResult?.industry || industry || null,
+        category: analysisResult?.category || category || null,
+        logoUrl,
         brandTone: analysisResult?.brandTone || null,
         brandPersonality: analysisResult?.brandPersonality || null,
-        brandColors: analysisResult?.brandColors || null,
+        brandColors: brandColors,
         automationSettings: {
           mode: automationMode,
           postsPerPeriod: postsPerPeriod,
@@ -153,13 +175,44 @@ export function BrandSetup() {
           createdAt: serverTimestamp()
         });
       }
-      alert("Brand saved successfully!");
+      
+      setSaved(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
     } catch (error) {
       console.error("Error saving brand:", error);
       alert("Failed to save brand.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogoUpload = (e: any) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addColor = () => {
+    if (newColor && !brandColors.includes(newColor)) {
+      setBrandColors([...brandColors, newColor]);
+    }
+  };
+
+  const removeColor = (colorToRemove: string) => {
+    setBrandColors(brandColors.filter(c => c !== colorToRemove));
+  };
+
+  const updateColor = (index: number, value: string) => {
+    const updated = [...brandColors];
+    updated[index] = value;
+    setBrandColors(updated);
   };
 
   if (loading) return <div className="p-8">Loading...</div>;
@@ -185,6 +238,29 @@ export function BrandSetup() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all"
                 placeholder="e.g., Acme Corp"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Brand Logo</label>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <ImageIcon className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
+                <label className="flex-1 cursor-pointer">
+                  <div className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors text-center">
+                    {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                </label>
+                {logoUrl && (
+                  <button onClick={() => setLogoUrl('')} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Website URL</label>
@@ -271,8 +347,49 @@ export function BrandSetup() {
 
         {/* Guidelines */}
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Brand Guidelines</h2>
-          <p className="text-sm text-gray-500">Paste your brand guidelines, mission statement, or any text that helps define your brand's voice.</p>
+          <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Brand Visuals & Guidelines</h2>
+          
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-gray-700">Color Palette</label>
+            <div className="flex flex-wrap gap-3">
+              {brandColors.map((color, i) => (
+                <div key={i} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs group">
+                  <input 
+                    type="color" 
+                    value={color} 
+                    onChange={(e) => updateColor(i, e.target.value)}
+                    className="w-6 h-6 rounded-full border border-gray-200 shadow-sm shrink-0 cursor-pointer overflow-hidden p-0" 
+                  />
+                  <input 
+                    type="text" 
+                    value={color} 
+                    onChange={(e) => updateColor(i, e.target.value)}
+                    className="text-xs font-mono text-gray-600 w-16 outline-none"
+                  />
+                  <button onClick={() => removeColor(color)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <input 
+                  type="color" 
+                  value={newColor} 
+                  onChange={(e) => setNewColor(e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-gray-200 shadow-sm shrink-0 cursor-pointer p-0" 
+                />
+                <button 
+                  onClick={addColor}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">Add your brand colors manually or use AI analysis below to detect them from your website/guidelines.</p>
+          </div>
+
+          <p className="text-sm text-gray-500 mt-6">Paste your brand guidelines, mission statement, or any text that helps define your brand's voice.</p>
           <textarea 
             value={guidelinesText}
             onChange={(e) => setGuidelinesText(e.target.value)}
@@ -293,38 +410,33 @@ export function BrandSetup() {
           </div>
         </div>
 
-        {/* Client Insights */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Client Insights</h2>
-          <p className="text-sm text-gray-500">What are your clients searching for or asking about? SocialVase will use these to suggest content topics. (One inquiry per line)</p>
-          <textarea 
-            value={clientInquiries}
-            onChange={(e) => setClientInquiries(e.target.value)}
-            rows={6}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all resize-none"
-            placeholder="e.g. How do I reduce my energy bill?&#10;What are the best eco-friendly packaging options?&#10;How does your subscription model work?"
-          />
-        </div>
-
         {/* Analysis Results */}
         {analysisResult && (
-          <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 space-y-4">
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 space-y-4 overflow-hidden">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">AI Analysis Results</h3>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Brand Tone</div>
-                <div className="text-sm font-medium">{analysisResult.brandTone}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="min-w-0">
+                <div className="text-xs text-gray-500 mb-1">Industry</div>
+                <div className="text-sm font-medium break-words">{analysisResult.industry}</div>
               </div>
-              <div>
+              <div className="min-w-0">
+                <div className="text-xs text-gray-500 mb-1">Business Category</div>
+                <div className="text-sm font-medium break-words">{analysisResult.category}</div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs text-gray-500 mb-1">Brand Tone</div>
+                <div className="text-sm font-medium break-words">{analysisResult.brandTone}</div>
+              </div>
+              <div className="min-w-0">
                 <div className="text-xs text-gray-500 mb-1">Brand Personality</div>
-                <div className="text-sm font-medium">{analysisResult.brandPersonality}</div>
+                <div className="text-sm font-medium break-words">{analysisResult.brandPersonality}</div>
               </div>
               <div className="col-span-full">
                 <div className="text-xs text-gray-500 mb-2">Extracted Colors</div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-4">
                   {analysisResult.brandColors?.map((color: string, i: number) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: color }} />
+                    <div key={i} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs">
+                      <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm shrink-0" style={{ backgroundColor: color }} />
                       <span className="text-xs font-mono text-gray-600">{color}</span>
                     </div>
                   ))}
@@ -338,11 +450,16 @@ export function BrandSetup() {
         <div className="pt-6 border-t border-gray-100 flex justify-end">
           <button
             onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
+            disabled={saving || saved}
+            className={`inline-flex items-center gap-2 px-6 py-3 font-medium rounded-xl transition-all ${
+              saved 
+                ? 'bg-emerald-500 text-white' 
+                : 'bg-black text-white hover:bg-gray-800'
+            } disabled:opacity-50`}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {saving ? 'Saving...' : 'Save Brand Settings'}
+            {saved ? <Check className="w-4 h-4" /> : null}
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Brand Settings'}
           </button>
         </div>
       </div>
