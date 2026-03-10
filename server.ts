@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import apiApp from "./api/index.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,9 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Mount Gemini API routes
+  app.use(apiApp);
 
   // API routes
   app.get("/api/health", (req, res) => {

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, orderBy, addDoc, serverTimestamp, limit, updateDoc, doc } from 'firebase/firestore';
-import { GoogleGenAI, Type } from '@google/genai';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell 
@@ -162,8 +161,6 @@ export function Analytics() {
     }
     setAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
       const performanceData = posts.map(p => ({
         content: p.content.substring(0, 100) + '...',
         mediaType: p.mediaType,
@@ -179,42 +176,17 @@ export function Analytics() {
         topLocation: Object.entries(s.locations).sort((a: any, b: any) => b[1] - a[1])[0][0]
       }));
 
-      const prompt = `Analyze the following social media performance and audience data for the brand "${brand.name}".
-      
-      Performance Data: ${JSON.stringify(performanceData)}
-      Audience Data: ${JSON.stringify(audienceSummary)}
-      
-      Provide insights into:
-      1. What content resonates best (media type, themes).
-      2. Top performing content types.
-      3. Audience demographics and how they differ by platform.
-      4. Actionable recommendations for future strategy based on WHO is watching.
-      
-      Return a JSON object:
-      {
-        "insightText": "A summary of overall performance and audience alignment.",
-        "recommendations": ["Rec 1", "Rec 2"],
-        "topPerformingThemes": ["Theme 1", "Theme 2"]
-      }`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              insightText: { type: Type.STRING },
-              recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-              topPerformingThemes: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ['insightText', 'recommendations', 'topPerformingThemes']
-          }
-        }
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand, performanceData, audienceSummary })
       });
-
-      const result = JSON.parse(response.text || '{}');
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate AI insights');
+      }
+      
+      const result = await response.json();
       
       const insightData = {
         userId: auth.currentUser?.uid,

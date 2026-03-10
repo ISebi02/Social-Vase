@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, limit, getDocFromServer } from 'firebase/firestore';
-import { GoogleGenAI, Type } from '@google/genai';
 import { Loader2, UploadCloud, Link as LinkIcon, Check, Plus, X, Image as ImageIcon } from 'lucide-react';
 
 export function BrandSetup() {
@@ -97,49 +96,17 @@ export function BrandSetup() {
     }
     setAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const prompt = `Analyze the following brand information to determine its industry, business category, tone, personality, and primary colors (in hex format).
-      
-      Brand Guidelines/Text: ${guidelinesText}
-      
-      Return a JSON object with the following structure:
-      {
-        "industry": "The broad industry (e.g., Technology, Healthcare, Fashion).",
-        "category": "The specific business category (e.g., SaaS, E-commerce, Personal Training).",
-        "brandTone": "A short description of the brand's tone of voice (e.g., Professional, Witty, Empathetic).",
-        "brandPersonality": "A short description of the brand's personality traits.",
-        "brandColors": ["#FFFFFF", "#000000"]
-      }`;
-
-      const config: any = {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            industry: { type: Type.STRING },
-            category: { type: Type.STRING },
-            brandTone: { type: Type.STRING },
-            brandPersonality: { type: Type.STRING },
-            brandColors: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ['industry', 'category', 'brandTone', 'brandPersonality', 'brandColors']
-        }
-      };
-
-      let finalPrompt = prompt;
-      if (websiteUrl) {
-        config.tools = [{ urlContext: {} }];
-        finalPrompt += `\n\nWebsite URL to analyze: ${websiteUrl}`;
-      }
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: finalPrompt,
-        config
+      const response = await fetch('/api/analyze-brand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteUrl, guidelinesText })
       });
-
-      const result = JSON.parse(response.text || '{}');
+      
+      if (!response.ok) {
+        throw new Error('Failed to analyze brand');
+      }
+      
+      const result = await response.json();
       setAnalysisResult(result);
       if (result.industry) setIndustry(result.industry);
       if (result.category) setCategory(result.category);

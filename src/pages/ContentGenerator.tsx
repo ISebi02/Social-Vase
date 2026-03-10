@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, limit } from 'firebase/firestore';
-import { GoogleGenAI } from '@google/genai';
 import { Loader2, Image as ImageIcon, Video, Type as TypeIcon, Calendar, PenTool, Sparkles, TrendingUp, PartyPopper, RefreshCw, Twitter, Linkedin, Instagram, Facebook } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
 
 export function ContentGenerator() {
   const [brand, setBrand] = useState<any>(null);
@@ -58,46 +66,18 @@ export function ContentGenerator() {
   const fetchSuggestions = async (brandData: any, query?: string) => {
     setFetchingSuggestions(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const searchContext = query 
-        ? `specifically related to "${query}"` 
-        : `relevant for a brand in the ${brandData.industry || 'general'} industry and ${brandData.category || 'business'} category`;
-      
-      const prompt = `Using Google Search, identify 5 current trending topics, news stories, or viral discussions ${searchContext} that would be perfect for social media content.
-      
-      Brand Context:
-      - Name: ${brandData.name}
-      - Industry: ${brandData.industry || 'N/A'}
-      - Category: ${brandData.category || 'N/A'}
-      
-      For each topic, provide:
-      1. A catchy title.
-      2. A brief explanation of why it's trending and how it relates to this brand.
-      3. The type (trend, news, or holiday).
-      
-      IMPORTANT: Return ONLY a valid JSON array of objects.
-      Format: [{"title": "...", "description": "...", "type": "..."}]`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }]
-        }
+      const response = await fetch('/api/trend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandData, query })
       });
-
-      const text = response.text || '[]';
-      // More robust JSON extraction
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      const cleanJson = jsonMatch ? jsonMatch[0] : '[]';
       
-      try {
-        const result = JSON.parse(cleanJson);
-        setSuggestions(Array.isArray(result) ? result : []);
-      } catch (e) {
-        console.error("Failed to parse suggestions JSON:", text);
-        setSuggestions([]);
+      if (!response.ok) {
+        throw new Error('Failed to fetch suggestions');
       }
+      
+      const result = await response.json();
+      setSuggestions(Array.isArray(result) ? result : []);
     } catch (error) {
       console.error("Error fetching suggestions:", error);
       setSuggestions([]);
@@ -110,51 +90,24 @@ export function ContentGenerator() {
     if (!brand) return;
     setPlanning(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const prompt = `Act as a strategic social media manager. Create a ${days}-day content calendar for the following brand.
-      
-      Brand Context:
-      - Name: ${brand.name}
-      - Industry: ${brand.industry || 'N/A'}
-      - Category: ${brand.category || 'N/A'}
-      - Tone: ${brand.brandTone}
-      - Personality: ${brand.brandPersonality}
-      
-      Instructions:
-      1. Use Google Search to find current trends, upcoming holidays, and industry-specific topics for the next ${days} days.
-      2. For each day, provide a content topic and a brief description of the post.
-      3. Distribute the topics logically over the ${days} days.
-      
-      IMPORTANT: Return ONLY a valid JSON array of objects.
-      Format: [{"day": 1, "topic": "...", "description": "...", "type": "..."}]`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Use Pro for complex planning
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }]
-        }
+      const response = await fetch('/api/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days, brand })
       });
-
-      const text = response.text || '[]';
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      const cleanJson = jsonMatch ? jsonMatch[0] : '[]';
       
-      let plan = [];
-      try {
-        plan = JSON.parse(cleanJson);
-      } catch (e) {
-        console.error("Failed to parse calendar plan JSON:", text);
-        throw new Error("The AI returned an invalid plan format. Please try again.");
+      if (!response.ok) {
+        throw new Error('Failed to plan calendar');
       }
+      
+      const result = await response.json();
 
-      if (!Array.isArray(plan) || plan.length === 0) {
+      if (!Array.isArray(result) || result.length === 0) {
         throw new Error("No plan was generated. Please try again.");
       }
 
       // Save each planned post to Firestore
-      const batch = plan.map(async (item: any, index: number) => {
+      const batch = result.map(async (item: any, index: number) => {
         const scheduledDate = new Date();
         scheduledDate.setDate(scheduledDate.getDate() + (index + 1));
         scheduledDate.setHours(10, 0, 0, 0);
@@ -204,113 +157,64 @@ export function ContentGenerator() {
     setGeneratedMediaUrl('');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      // Generate Text Content with Grounding if it's a trend
-      const textPrompt = `You are an expert social media manager. Write a highly engaging, humanized social media post about "${finalTopic}".
-      
-      Tailor the content specifically for the following platforms: ${selectedPlatforms.join(', ')}.
-      
-      ${isTrend ? 'This is a trending topic. Use Google Search to find the latest details, facts, or sentiment about this topic to ensure the post is accurate and timely.' : ''}
-      
-      Brand Context:
-      - Name: ${brand.name}
-      - Industry: ${brand.industry || 'N/A'}
-      - Category: ${brand.category || 'N/A'}
-      - Tone: ${brand.brandTone || 'Professional but approachable'}
-      - Personality: ${brand.brandPersonality || 'Helpful and innovative'}
-      
-      The post should NOT sound like AI. Make it relatable, use appropriate spacing, and include relevant hashtags for each platform. If multiple platforms are selected, provide a single cohesive post that works well across all of them or slightly varied versions if necessary.`;
-
-      const textResponse = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: textPrompt,
-        config: isTrend ? { tools: [{ googleSearch: {} }] } : undefined
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          finalTopic,
+          isTrend,
+          brand,
+          selectedPlatforms,
+          mediaType,
+          aspectRatio,
+          quality,
+          videoResolution
+        })
       });
       
-      setGeneratedContent(textResponse.text || '');
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+      
+      const data = await response.json();
+      setGeneratedContent(data.text || '');
 
-      // Generate Media if requested
-      if (mediaType === 'image') {
-        const imagePrompt = `A high-quality, professional social media graphic for a brand named ${brand.name}. Topic: ${finalTopic}. Brand colors: ${brand.brandColors?.join(', ') || 'neutral'}. Style: Modern, clean, relatable, no text overlays.`;
-        
-        const imageResponse = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-image-preview',
-          contents: { parts: [{ text: imagePrompt }] },
-          config: {
-            imageConfig: { 
-              aspectRatio: aspectRatio as any, 
-              imageSize: quality as any 
-            }
-          }
-        });
-
-        for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-            const base64Image = `data:image/png;base64,${part.inlineData.data}`;
-            
-            if (brand.logoUrl) {
-              // Overlay logo using Canvas
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              const img = new Image();
-              const logo = new Image();
-              
-              await new Promise((resolve) => {
-                img.onload = resolve;
-                img.src = base64Image;
-              });
-              
-              await new Promise((resolve) => {
-                logo.onload = resolve;
-                logo.src = brand.logoUrl;
-              });
-              
-              canvas.width = img.width;
-              canvas.height = img.height;
-              ctx?.drawImage(img, 0, 0);
-              
-              // Draw logo in bottom right corner
-              const logoWidth = canvas.width * 0.15; // 15% of image width
-              const logoHeight = (logo.height / logo.width) * logoWidth;
-              const padding = 20;
-              ctx?.drawImage(logo, canvas.width - logoWidth - padding, canvas.height - logoHeight - padding, logoWidth, logoHeight);
-              
-              setGeneratedMediaUrl(canvas.toDataURL('image/png'));
-            } else {
-              setGeneratedMediaUrl(base64Image);
-            }
-            break;
-          }
-        }
-      } else if (mediaType === 'video') {
-        const videoPrompt = `A high-quality, professional short video clip for a brand named ${brand.name}. Topic: ${finalTopic}. Style: Cinematic, modern, clean.`;
-        
-        let operation = await ai.models.generateVideos({
-          model: 'veo-3.1-fast-generate-preview',
-          prompt: videoPrompt,
-          config: {
-            numberOfVideos: 1,
-            resolution: videoResolution as any,
-            aspectRatio: aspectRatio === '16:9' || aspectRatio === '9:16' ? aspectRatio : '16:9'
-          }
-        });
-
-        // Poll for completion
-        while (!operation.done) {
-          await new Promise(resolve => setTimeout(resolve, 10000));
-          operation = await ai.operations.getVideosOperation({operation: operation});
-        }
-
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (downloadLink) {
-          const videoResponse = await fetch(downloadLink, {
-            method: 'GET',
-            headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY as string },
+      // Handle Media if requested
+      if (mediaType === 'image' && data.mediaUrl) {
+        if (brand.logoUrl) {
+          // Overlay logo using Canvas
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+          const logo = new Image();
+          
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.src = data.mediaUrl;
           });
-          const blob = await videoResponse.blob();
-          setGeneratedMediaUrl(URL.createObjectURL(blob));
+          
+          await new Promise((resolve) => {
+            logo.onload = resolve;
+            logo.src = brand.logoUrl;
+          });
+          
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx?.drawImage(img, 0, 0);
+          
+          // Draw logo in bottom right corner
+          const logoWidth = canvas.width * 0.15; // 15% of image width
+          const logoHeight = (logo.height / logo.width) * logoWidth;
+          const padding = 20;
+          ctx?.drawImage(logo, canvas.width - logoWidth - padding, canvas.height - logoHeight - padding, logoWidth, logoHeight);
+          
+          setGeneratedMediaUrl(canvas.toDataURL('image/png'));
+        } else {
+          setGeneratedMediaUrl(data.mediaUrl);
         }
+      } else if (mediaType === 'video' && data.videoDownloadLink) {
+        // Just set the URL. The browser will fetch it.
+        setGeneratedMediaUrl(data.videoDownloadLink);
       }
 
     } catch (error) {
