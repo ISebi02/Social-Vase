@@ -73,13 +73,15 @@ export function ContentGenerator() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch suggestions');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to fetch suggestions');
       }
       
       const result = await response.json();
       setSuggestions(Array.isArray(result) ? result : []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching suggestions:", error);
+      alert(error.message || "Failed to fetch trending topics. Please try again.");
       setSuggestions([]);
     } finally {
       setFetchingSuggestions(false);

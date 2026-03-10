@@ -46,15 +46,25 @@ app.post("/api/trend", async (req, res) => {
       }
     });
 
-    const text = response.text || '[]';
+    if (!response.text) {
+      console.error("No text in response:", response);
+      return res.status(500).json({ error: "No content generated" });
+    }
+
+    const text = response.text;
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     const cleanJson = jsonMatch ? jsonMatch[0] : '[]';
     
-    const result = JSON.parse(cleanJson);
-    res.json(Array.isArray(result) ? result : []);
+    try {
+      const result = JSON.parse(cleanJson);
+      res.json(Array.isArray(result) ? result : []);
+    } catch (parseError) {
+      console.error("Failed to parse JSON:", text);
+      res.status(500).json({ error: "Invalid JSON format returned" });
+    }
   } catch (error: any) {
     console.error("Trend API Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Unknown error" });
   }
 });
 
