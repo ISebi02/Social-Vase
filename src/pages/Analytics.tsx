@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, orderBy, addDoc, serverTimestamp, limit, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, addDoc, serverTimestamp, limit, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell 
@@ -11,6 +11,7 @@ import {
   Sparkles, RefreshCw, AlertCircle, CheckCircle2, ArrowRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import * as geminiService from '../services/geminiService';
 
 export function Analytics() {
   const [brand, setBrand] = useState<any>(null);
@@ -26,24 +27,40 @@ export function Analytics() {
     const fetchData = async () => {
       if (!auth.currentUser) return;
       try {
-        // Fetch Brand
-        const brandQ = query(
-          collection(db, 'brands'),
-          where('userId', '==', auth.currentUser.uid),
-          limit(1)
-        );
-        const brandSnap = await getDocs(brandQ);
-        if (brandSnap.empty) {
+        const activeBrandId = localStorage.getItem('activeBrandId');
+        let brandData = null;
+
+        if (activeBrandId) {
+          const brandDoc = await getDoc(doc(db, 'brands', activeBrandId));
+          if (brandDoc.exists() && brandDoc.data().userId === auth.currentUser.uid) {
+            brandData = { id: brandDoc.id, ...brandDoc.data() };
+          }
+        }
+
+        if (!brandData) {
+          const brandQ = query(
+            collection(db, 'brands'),
+            where('userId', '==', auth.currentUser.uid),
+            limit(1)
+          );
+          const brandSnap = await getDocs(brandQ);
+          if (!brandSnap.empty) {
+            brandData = { id: brandSnap.docs[0].id, ...brandSnap.docs[0].data() };
+            localStorage.setItem('activeBrandId', brandData.id);
+          }
+        }
+
+        if (!brandData) {
           setLoading(false);
           return;
         }
-        const brandData = { id: brandSnap.docs[0].id, ...brandSnap.docs[0].data() };
         setBrand(brandData);
 
-        // Fetch Published Posts
+        // Fetch Published Posts for this brand
         const postsQ = query(
           collection(db, 'posts'),
           where('userId', '==', auth.currentUser.uid),
+          where('brandId', '==', brandData.id),
           where('status', '==', 'published'),
           orderBy('updatedAt', 'desc')
         );
@@ -176,17 +193,7 @@ export function Analytics() {
         topLocation: Object.entries(s.locations).sort((a: any, b: any) => b[1] - a[1])[0][0]
       }));
 
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand, performanceData, audienceSummary })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate AI insights');
-      }
-      
-      const result = await response.json();
+      const result = await geminiService.analyzePerformance(performanceData, audienceSummary, brand.name);
       
       const insightData = {
         userId: auth.currentUser?.uid,

@@ -14,13 +14,24 @@ export function Scheduler() {
     const fetchPosts = async () => {
       if (!auth.currentUser) return;
       try {
-        const q = query(
-          collection(db, 'posts'),
-          where('userId', '==', auth.currentUser.uid),
-          orderBy('scheduledTime', 'asc')
-        );
+        const activeBrandId = localStorage.getItem('activeBrandId');
+        let q;
+        if (activeBrandId) {
+          q = query(
+            collection(db, 'posts'),
+            where('userId', '==', auth.currentUser.uid),
+            where('brandId', '==', activeBrandId),
+            orderBy('scheduledTime', 'asc')
+          );
+        } else {
+          q = query(
+            collection(db, 'posts'),
+            where('userId', '==', auth.currentUser.uid),
+            orderBy('scheduledTime', 'asc')
+          );
+        }
         const snapshot = await getDocs(q);
-        const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const postsData = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
         setPosts(postsData);
       } catch (error) {
         console.error("Error fetching posts:", error);

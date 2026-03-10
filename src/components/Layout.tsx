@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { auth, logout } from '../firebase';
-import { LogOut, LayoutDashboard, Settings, PenTool, Calendar, BarChart3, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, LayoutDashboard, Settings, PenTool, Calendar, BarChart3, Menu, X, ChevronLeft, ChevronRight, Briefcase, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState, useEffect } from 'react';
 
@@ -17,10 +17,11 @@ export function Layout() {
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Brand Setup', path: '/brand-setup', icon: Settings },
+    { name: 'Brands', path: '/brands', icon: Briefcase },
     { name: 'Content Generator', path: '/generate', icon: PenTool },
     { name: 'Scheduler', path: '/schedule', icon: Calendar },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { name: 'Profile', path: '/profile', icon: User },
   ];
 
   // Close mobile menu on navigation

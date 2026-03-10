@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, PenTool, Settings, BarChart3, TrendingUp } from 'lucide-react';
 
@@ -12,14 +12,31 @@ export function Dashboard() {
     const fetchBrand = async () => {
       if (!auth.currentUser) return;
       try {
-        const q = query(
-          collection(db, 'brands'),
-          where('userId', '==', auth.currentUser.uid),
-          limit(1)
-        );
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          setBrand({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
+        const activeBrandId = localStorage.getItem('activeBrandId');
+        let brandData = null;
+
+        if (activeBrandId) {
+          const brandDoc = await getDoc(doc(db, 'brands', activeBrandId));
+          if (brandDoc.exists() && brandDoc.data().userId === auth.currentUser.uid) {
+            brandData = { id: brandDoc.id, ...brandDoc.data() };
+          }
+        }
+
+        if (!brandData) {
+          const q = query(
+            collection(db, 'brands'),
+            where('userId', '==', auth.currentUser.uid),
+            limit(1)
+          );
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            brandData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+            localStorage.setItem('activeBrandId', brandData.id);
+          }
+        }
+
+        if (brandData) {
+          setBrand(brandData);
         }
       } catch (error) {
         console.error("Error fetching brand:", error);

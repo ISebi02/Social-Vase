@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, limit, doc, getDoc } from 'firebase/firestore';
 import { Loader2, Image as ImageIcon, Video, Type as TypeIcon, Calendar, PenTool, Sparkles, TrendingUp, PartyPopper, RefreshCw, Twitter, Linkedin, Instagram, Facebook } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import * as geminiService from '../services/geminiService';
 
 declare global {
   interface Window {
@@ -23,6 +24,8 @@ export function ContentGenerator() {
   const [aspectRatio, setAspectRatio] = useState('1:1');
   const [quality, setQuality] = useState('1K');
   const [videoResolution, setVideoResolution] = useState('720p');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(false);
   
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['twitter', 'linkedin']);
   
@@ -32,6 +35,12 @@ export function ContentGenerator() {
   const [generatedMediaUrl, setGeneratedMediaUrl] = useState('');
   
   const [scheduling, setScheduling] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    date.setHours(10, 0, 0, 0);
+    return date.toISOString().slice(0, 16); // Format for datetime-local input
+  });
   const [planning, setPlanning] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [fetchingSuggestions, setFetchingSuggestions] = useState(false);
@@ -42,14 +51,30 @@ export function ContentGenerator() {
     const fetchBrand = async () => {
       if (!auth.currentUser) return;
       try {
-        const q = query(
-          collection(db, 'brands'),
-          where('userId', '==', auth.currentUser.uid),
-          limit(1)
-        );
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const brandData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+        const activeBrandId = localStorage.getItem('activeBrandId');
+        let brandData = null;
+
+        if (activeBrandId) {
+          const brandDoc = await getDoc(doc(db, 'brands', activeBrandId));
+          if (brandDoc.exists() && brandDoc.data().userId === auth.currentUser.uid) {
+            brandData = { id: brandDoc.id, ...brandDoc.data() };
+          }
+        }
+
+        if (!brandData) {
+          const q = query(
+            collection(db, 'brands'),
+            where('userId', '==', auth.currentUser.uid),
+            limit(1)
+          );
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            brandData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+            localStorage.setItem('activeBrandId', brandData.id);
+          }
+        }
+
+        if (brandData) {
           setBrand(brandData);
           fetchSuggestions(brandData);
         }
@@ -63,22 +88,31 @@ export function ContentGenerator() {
     fetchBrand();
   }, []);
 
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(hasKey);
+      }
+    };
+    checkApiKey();
+    const interval = setInterval(checkApiKey, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (mediaType === 'image') {
+      setSelectedModel('gemini-3-pro-image-preview');
+    } else if (mediaType === 'video') {
+      setSelectedModel('veo-3.1-fast-generate-preview');
+    }
+  }, [mediaType]);
+
   const fetchSuggestions = async (brandData: any, query?: string) => {
     setFetchingSuggestions(true);
     try {
-      const response = await fetch('/api/trend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandData, query })
-      });
-      
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to fetch suggestions');
-      }
-      
-      const result = await response.json();
-      setSuggestions(Array.isArray(result) ? result : []);
+      const result = await geminiService.fetchSuggestions(brandData, query);
+      setSuggestions(result);
     } catch (error: any) {
       console.error("Error fetching suggestions:", error);
       alert(error.message || "Failed to fetch trending topics. Please try again.");
@@ -92,17 +126,7 @@ export function ContentGenerator() {
     if (!brand) return;
     setPlanning(true);
     try {
-      const response = await fetch('/api/plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days, brand })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to plan calendar');
-      }
-      
-      const result = await response.json();
+      const result = await geminiService.planCalendar(days, brand);
 
       if (!Array.isArray(result) || result.length === 0) {
         throw new Error("No plan was generated. Please try again.");
@@ -118,11 +142,11 @@ export function ContentGenerator() {
           return await addDoc(collection(db, 'posts'), {
             userId: auth.currentUser?.uid,
             brandId: brand.id,
-            content: `${item.topic}\n\n${item.description}`,
+            content: `${item.topic}\n\n${item.content || ''}`,
             status: 'suggested',
             scheduledTime: scheduledDate,
-            platforms: selectedPlatforms,
-            mediaType: 'none',
+            platforms: [item.platform || 'twitter'],
+            mediaType: item.mediaType || 'none',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             isPlanned: true
@@ -159,26 +183,18 @@ export function ContentGenerator() {
     setGeneratedMediaUrl('');
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          finalTopic,
-          isTrend,
-          brand,
-          selectedPlatforms,
-          mediaType,
-          aspectRatio,
-          quality,
-          videoResolution
-        })
+      const data = await geminiService.generateContent({
+        finalTopic,
+        isTrend,
+        brand,
+        selectedPlatforms,
+        mediaType,
+        aspectRatio,
+        quality,
+        videoResolution,
+        modelName: selectedModel
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to generate content');
-      }
-      
-      const data = await response.json();
       setGeneratedContent(data.text || '');
 
       // Handle Media if requested
@@ -219,9 +235,9 @@ export function ContentGenerator() {
         setGeneratedMediaUrl(data.videoDownloadLink);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Generation failed:", error);
-      alert("Failed to generate content. Please try again.");
+      alert(error.message || "Failed to generate content. Please try again.");
     } finally {
       setGenerating(false);
     }
@@ -232,11 +248,7 @@ export function ContentGenerator() {
     
     setScheduling(true);
     try {
-      // Default schedule for tomorrow at 10 AM
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(10, 0, 0, 0);
-
+      const scheduleTime = new Date(scheduledDate);
       const status = brand.automationSettings?.mode === 'auto' ? 'scheduled' : 'suggested';
 
       try {
@@ -244,9 +256,9 @@ export function ContentGenerator() {
           userId: auth.currentUser?.uid,
           brandId: brand.id,
           content: generatedContent,
-          mediaUrl: generatedMediaUrl || null,
+          mediaUrl: generatedMediaUrl || '',
           mediaType: mediaType,
-          scheduledTime: tomorrow,
+          scheduledTime: scheduleTime,
           status: status,
           platforms: selectedPlatforms,
           createdAt: serverTimestamp(),
@@ -450,6 +462,38 @@ export function ContentGenerator() {
 
           {mediaType !== 'none' && (
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Model</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none bg-white"
+                  >
+                    {mediaType === 'image' ? (
+                      <>
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                        <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash Image</option>
+                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast</option>
+                        <option value="veo-3.1-generate-preview">Veo 3.1 High Quality</option>
+                      </>
+                    )}
+                  </select>
+                  {!hasApiKey && (
+                    <button
+                      onClick={() => window.aistudio?.openSelectKey()}
+                      className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      {mediaType === 'video' ? 'Video' : 'Select Key'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Aspect Ratio</label>
@@ -529,46 +573,61 @@ export function ContentGenerator() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col">
-              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6 flex-1">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500">
-                      {brand.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm">{brand.name}</div>
-                      <div className="text-xs text-gray-500">Just now</div>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                  >
-                    <PenTool className="w-3 h-3" />
-                    {isEditing ? 'Preview' : 'Edit Content'}
-                  </button>
-                </div>
-                
-                {isEditing ? (
-                  <textarea
-                    value={generatedContent}
-                    onChange={(e) => setGeneratedContent(e.target.value)}
-                    rows={8}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all resize-none mb-4"
+              <div className="space-y-4 mb-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Schedule Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none bg-white"
                   />
-                ) : (
-                  <div className="text-sm text-gray-800 whitespace-pre-wrap mb-4">
-                    {generatedContent}
-                  </div>
-                )}
+                </div>
 
-                {generatedMediaUrl && mediaType === 'image' && (
-                  <img src={generatedMediaUrl} alt="Generated content" className="w-full rounded-lg border border-gray-100" />
-                )}
-                
-                {generatedMediaUrl && mediaType === 'video' && (
-                  <video src={generatedMediaUrl} controls className="w-full rounded-lg border border-gray-100" />
-                )}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex-1">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500">
+                        {brand.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">{brand.name}</div>
+                        <div className="text-xs text-gray-500">Just now</div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setIsEditing(!isEditing)}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      <PenTool className="w-3 h-3" />
+                      {isEditing ? 'Preview' : 'Edit Content'}
+                    </button>
+                  </div>
+                  
+                  {isEditing ? (
+                    <textarea
+                      value={generatedContent}
+                      onChange={(e) => setGeneratedContent(e.target.value)}
+                      rows={8}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all resize-none mb-4"
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-800 whitespace-pre-wrap mb-4">
+                      {generatedContent}
+                    </div>
+                  )}
+
+                  {generatedMediaUrl && mediaType === 'image' && (
+                    <img src={generatedMediaUrl} alt="Generated content" className="w-full rounded-lg border border-gray-100" />
+                  )}
+                  
+                  {generatedMediaUrl && mediaType === 'video' && (
+                    <video src={generatedMediaUrl} controls className="w-full rounded-lg border border-gray-100" />
+                  )}
+                </div>
               </div>
 
               <button
@@ -580,7 +639,7 @@ export function ContentGenerator() {
                 {scheduling 
                   ? 'Processing...' 
                   : brand.automationSettings?.mode === 'auto' 
-                    ? 'Schedule for Tomorrow' 
+                    ? 'Schedule Post' 
                     : 'Save for Approval'}
               </button>
               

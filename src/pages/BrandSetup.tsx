@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, limit, getDocFromServer } from 'firebase/firestore';
-import { Loader2, UploadCloud, Link as LinkIcon, Check, Plus, X, Image as ImageIcon } from 'lucide-react';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, limit, getDocFromServer, getDoc } from 'firebase/firestore';
+import { Loader2, UploadCloud, Link as LinkIcon, Check, Plus, X, Image as ImageIcon, ChevronLeft } from 'lucide-react';
+import * as geminiService from '../services/geminiService';
 
 export function BrandSetup() {
   const navigate = useNavigate();
+  const { brandId } = useParams();
   const [brand, setBrand] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,6 +46,57 @@ export function BrandSetup() {
 
     const fetchBrand = async () => {
       if (!auth.currentUser) return;
+      
+      // If we have a brandId, fetch that specific brand
+      if (brandId) {
+        try {
+          const brandDoc = await getDoc(doc(db, 'brands', brandId));
+          if (brandDoc.exists()) {
+            const data = brandDoc.data();
+            // Ensure the brand belongs to the current user
+            if (data.userId !== auth.currentUser.uid) {
+              navigate('/brands');
+              return;
+            }
+            setBrand({ id: brandDoc.id, ...data });
+            setName(data.name || '');
+            setWebsiteUrl(data.websiteUrl || '');
+            setGuidelinesText(data.guidelinesText || '');
+            setSocialUrls(data.socialUrls ? data.socialUrls.join(', ') : '');
+            setLogoUrl(data.logoUrl || '');
+            setBrandColors(data.brandColors || []);
+            
+            if (data.automationSettings) {
+              setAutomationMode(data.automationSettings.mode || 'manual');
+              setPostsPerPeriod(data.automationSettings.postsPerPeriod || 1);
+              setPeriodUnit(data.automationSettings.periodUnit || 'day');
+            }
+
+            if (data.brandTone) {
+              setAnalysisResult({
+                brandTone: data.brandTone,
+                brandPersonality: data.brandPersonality,
+                brandColors: data.brandColors,
+                industry: data.industry,
+                category: data.category
+              });
+              setIndustry(data.industry || '');
+              setCategory(data.category || '');
+            }
+          } else {
+            navigate('/brands');
+          }
+        } catch (error) {
+          console.error("Error fetching brand:", error);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // If no brandId, check if the user has any brands at all
+      // If they have none, this is their first setup
+      // If they have some, this is adding a new one
       try {
         const q = query(
           collection(db, 'brands'),
@@ -51,43 +104,18 @@ export function BrandSetup() {
           limit(1)
         );
         const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setBrand({ id: snapshot.docs[0].id, ...data });
-          setName(data.name || '');
-          setWebsiteUrl(data.websiteUrl || '');
-          setGuidelinesText(data.guidelinesText || '');
-          setSocialUrls(data.socialUrls ? data.socialUrls.join(', ') : '');
-          setLogoUrl(data.logoUrl || '');
-          setBrandColors(data.brandColors || []);
-          
-          if (data.automationSettings) {
-            setAutomationMode(data.automationSettings.mode || 'manual');
-            setPostsPerPeriod(data.automationSettings.postsPerPeriod || 1);
-            setPeriodUnit(data.automationSettings.periodUnit || 'day');
-          }
-
-          if (data.brandTone) {
-            setAnalysisResult({
-              brandTone: data.brandTone,
-              brandPersonality: data.brandPersonality,
-              brandColors: data.brandColors,
-              industry: data.industry,
-              category: data.category
-            });
-            setIndustry(data.industry || '');
-            setCategory(data.category || '');
-          }
-        }
+        // We don't auto-load the first brand anymore if brandId is not provided
+        // because we want to allow creating new ones.
+        // But we might want to know if it's the very first setup.
       } catch (error) {
-        console.error("Error fetching brand:", error);
+        console.error("Error checking brands:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchBrand();
-  }, []);
+  }, [brandId]);
 
   const handleAnalyze = async () => {
     if (!websiteUrl && !guidelinesText) {
@@ -96,17 +124,7 @@ export function BrandSetup() {
     }
     setAnalyzing(true);
     try {
-      const response = await fetch('/api/analyze-brand', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ websiteUrl, guidelinesText })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to analyze brand');
-      }
-      
-      const result = await response.json();
+      const result = await geminiService.analyzeBrand(websiteUrl, guidelinesText);
       setAnalysisResult(result);
       if (result.industry) setIndustry(result.industry);
       if (result.category) setCategory(result.category);
@@ -166,7 +184,7 @@ export function BrandSetup() {
       
       setSaved(true);
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/brands');
       }, 1500);
     } catch (error: any) {
       console.error("Error saving brand:", error);
@@ -216,9 +234,22 @@ export function BrandSetup() {
 
   return (
     <div className="space-y-8 max-w-4xl">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Brand Setup</h1>
-        <p className="text-gray-500 mt-1">Define your brand so SocialVase can generate accurate content.</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <button 
+              onClick={() => navigate('/brands')}
+              className="p-1 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Brand Management</span>
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+            {brand ? `Edit ${brand.name}` : 'Create New Brand'}
+          </h1>
+          <p className="text-gray-500 mt-1">Define your brand so SocialVase can generate accurate content.</p>
+        </div>
       </header>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm space-y-8">
