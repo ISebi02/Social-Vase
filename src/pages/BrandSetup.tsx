@@ -347,7 +347,24 @@ export function BrandSetup() {
 
         {/* Guidelines */}
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Brand Visuals & Guidelines</h2>
+          <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Connected Accounts</h2>
+          <div className="flex gap-2">
+            {['twitter', 'linkedin'].map(platform => (
+              <button
+                key={platform}
+                onClick={async () => {
+                  const res = await fetch(`/api/auth/url/${platform}`);
+                  const { url } = await res.json();
+                  window.open(url, 'oauth_popup', 'width=600,height=700');
+                }}
+                className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+              >
+                Connect {platform.charAt(0).toUpperCase() + platform.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          <h2 className="text-lg font-semibold border-b border-gray-100 pb-2 mt-8">Brand Visuals & Guidelines</h2>
           
           <div className="space-y-3">
             <label className="text-sm font-medium text-gray-700">Color Palette</label>

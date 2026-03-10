@@ -129,6 +129,16 @@ service cloud.firestore {
              data.updatedAt is timestamp;
     }
 
+    function isValidSocialAccount(data) {
+      return hasOnlyAllowedFields(['userId', 'brandId', 'platform', 'accessToken', 'refreshToken', 'expiresAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.brandId is string && data.brandId.size() > 0 && data.brandId.size() < 100 &&
+             data.platform in ['twitter', 'linkedin', 'instagram', 'facebook'] &&
+             data.accessToken is string && data.accessToken.size() > 0 && data.accessToken.size() <= 5000 &&
+             (!('refreshToken' in data) || (data.refreshToken is string && data.refreshToken.size() <= 5000)) &&
+             (!('expiresAt' in data) || data.expiresAt is timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -165,6 +175,13 @@ service cloud.firestore {
       allow read: if isDocOwner();
       allow create: if isRequestDocOwner() && isValidAudienceStat(request.resource.data) && userIdUnchanged();
       allow update: if isDocOwner() && isRequestDocOwner() && isValidAudienceStat(request.resource.data) && userIdNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /social_accounts/{accountId} {
+      allow read: if isDocOwner();
+      allow create: if isRequestDocOwner() && isValidSocialAccount(request.resource.data) && userIdUnchanged();
+      allow update: if isDocOwner() && isRequestDocOwner() && isValidSocialAccount(request.resource.data) && userIdNotModified();
       allow delete: if isDocOwner();
     }
   }

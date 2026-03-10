@@ -565,6 +565,20 @@ export function ContentGenerator() {
                     : 'Save for Approval'}
               </button>
               
+              <button
+                onClick={async () => {
+                  await fetch('/api/post', {
+                    method: 'POST',
+                    body: JSON.stringify({ content: generatedContent, platforms: selectedPlatforms }),
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  alert('Posted successfully!');
+                }}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white text-black border border-black font-medium rounded-xl hover:bg-gray-50 transition-colors mt-2"
+              >
+                Post Now
+              </button>
+              
               <div className="mt-4 p-3 bg-gray-100 rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-gray-500">
                   <span>Automation Mode</span>

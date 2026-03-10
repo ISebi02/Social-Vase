@@ -93,6 +93,20 @@
         "updatedAt": { "type": "timestamp", "description": "When the data was last updated." }
       },
       "required": ["userId", "brandId", "platform", "updatedAt"]
+    },
+    "SocialAccount": {
+      "title": "SocialAccount",
+      "description": "Stores OAuth tokens for linked social media accounts.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the user who owns this account." },
+        "brandId": { "type": "string", "description": "Reference to the BrandProfile." },
+        "platform": { "type": "string", "enum": ["twitter", "linkedin", "instagram", "facebook"] },
+        "accessToken": { "type": "string", "description": "Encrypted access token." },
+        "refreshToken": { "type": "string", "description": "Encrypted refresh token." },
+        "expiresAt": { "type": "timestamp", "description": "When the token expires." }
+      },
+      "required": ["userId", "brandId", "platform", "accessToken"]
     }
   },
   "firestore": {
@@ -115,6 +129,10 @@
     "/audience_stats/{statId}": {
       "schema": { "$ref": "#/entities/AudienceStats" },
       "description": "Stores audience demographic statistics."
+    },
+    "/social_accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/SocialAccount" },
+      "description": "Stores linked social media accounts."
     }
   }
 }
