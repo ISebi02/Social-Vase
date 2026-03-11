@@ -180,6 +180,16 @@ export function ContentGenerator() {
       return;
     }
 
+    // Check for API key if using image/video models
+    if (mediaType === 'image' || mediaType === 'video') {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        alert("Please select a paid API key to generate images or videos.");
+        await window.aistudio.openSelectKey();
+        return;
+      }
+    }
+
     setGenerating(true);
     setGeneratedContent('');
     setGeneratedMediaUrl('');

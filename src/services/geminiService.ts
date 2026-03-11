@@ -160,7 +160,8 @@ export const generateContent = async (params: {
     const imagePrompt = `A high-quality, professional social media graphic for ${brand.name}. 
     Subject: ${finalTopic}. 
     Brand Aesthetic: ${brand.brandTone}, ${brand.brandPersonality}.
-    Colors: ${brand.brandColors?.join(', ') || 'modern professional palette'}. 
+    Colors: Primary: ${brand.primaryColor || 'N/A'}, Secondary: ${brand.secondaryColor || 'N/A'}, Accent: ${brand.accentColor || 'N/A'}. 
+    Additional Palette: ${brand.brandColors?.join(', ') || 'modern professional palette'}. 
     Style: Clean, high-end photography or professional graphic design. 
     NO TEXT OVERLAYS. NO PLACEHOLDERS.`;
     
@@ -227,7 +228,7 @@ export const analyzeBrand = async (websiteUrl: string, guidelinesText: string) =
   
   const ai = new GoogleGenAI({ apiKey });
   
-  let prompt = `Analyze the following brand information to determine its industry, business category, tone, personality, and primary colors (in hex format).
+  let prompt = `Analyze the following brand information to determine its industry, business category, tone, personality, and primary, secondary, and accent colors (in hex format).
   
   Brand Guidelines/Text: ${guidelinesText}
   
@@ -237,7 +238,9 @@ export const analyzeBrand = async (websiteUrl: string, guidelinesText: string) =
     "category": "The specific business category (e.g., SaaS, E-commerce, Personal Training).",
     "brandTone": "A short description of the brand's tone of voice (e.g., Professional, Witty, Empathetic).",
     "brandPersonality": "A short description of the brand's personality traits.",
-    "brandColors": ["#FFFFFF", "#000000"]
+    "primaryColor": "#FFFFFF",
+    "secondaryColor": "#000000",
+    "accentColor": "#FF0000"
   }`;
 
   const config: any = {
@@ -249,9 +252,11 @@ export const analyzeBrand = async (websiteUrl: string, guidelinesText: string) =
         category: { type: Type.STRING },
         brandTone: { type: Type.STRING },
         brandPersonality: { type: Type.STRING },
-        brandColors: { type: Type.ARRAY, items: { type: Type.STRING } }
+        primaryColor: { type: Type.STRING },
+        secondaryColor: { type: Type.STRING },
+        accentColor: { type: Type.STRING }
       },
-      required: ['industry', 'category', 'brandTone', 'brandPersonality', 'brandColors']
+      required: ['industry', 'category', 'brandTone', 'brandPersonality', 'primaryColor', 'secondaryColor', 'accentColor']
     }
   };
 

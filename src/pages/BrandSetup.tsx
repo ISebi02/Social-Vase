@@ -18,6 +18,9 @@ export function BrandSetup() {
   const [guidelinesText, setGuidelinesText] = useState('');
   const [socialUrls, setSocialUrls] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#000000');
+  const [secondaryColor, setSecondaryColor] = useState('#666666');
+  const [accentColor, setAccentColor] = useState('#ff0000');
   const [brandColors, setBrandColors] = useState<string[]>([]);
   const [newColor, setNewColor] = useState('#000000');
 
@@ -64,6 +67,9 @@ export function BrandSetup() {
             setGuidelinesText(data.guidelinesText || '');
             setSocialUrls(data.socialUrls ? data.socialUrls.join(', ') : '');
             setLogoUrl(data.logoUrl || '');
+            setPrimaryColor(data.primaryColor || '#000000');
+            setSecondaryColor(data.secondaryColor || '#666666');
+            setAccentColor(data.accentColor || '#ff0000');
             setBrandColors(data.brandColors || []);
             
             if (data.automationSettings) {
@@ -128,7 +134,9 @@ export function BrandSetup() {
       setAnalysisResult(result);
       if (result.industry) setIndustry(result.industry);
       if (result.category) setCategory(result.category);
-      if (result.brandColors) setBrandColors(result.brandColors);
+      if (result.primaryColor) setPrimaryColor(result.primaryColor);
+      if (result.secondaryColor) setSecondaryColor(result.secondaryColor);
+      if (result.accentColor) setAccentColor(result.accentColor);
     } catch (error) {
       console.error("Analysis failed:", error);
       alert("Failed to analyze brand. Please try again.");
@@ -150,6 +158,9 @@ export function BrandSetup() {
         websiteUrl,
         socialUrls: socialUrls.split(',').map(s => s.trim()).filter(Boolean),
         guidelinesText,
+        primaryColor,
+        secondaryColor,
+        accentColor,
         brandColors: brandColors,
         automationSettings: {
           mode: automationMode,
@@ -395,7 +406,22 @@ export function BrandSetup() {
           <h2 className="text-lg font-semibold border-b border-gray-100 pb-2 mt-8">Brand Visuals & Guidelines</h2>
           
           <div className="space-y-3">
-            <label className="text-sm font-medium text-gray-700">Color Palette</label>
+            <label className="text-sm font-medium text-gray-700">Brand Colors</label>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Primary</label>
+                <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Secondary</label>
+                <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Accent</label>
+                <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+              </div>
+            </div>
+            <label className="text-sm font-medium text-gray-700 mt-4 block">Additional Palette</label>
             <div className="flex flex-wrap gap-3">
               {brandColors.map((color, i) => (
                 <div key={i} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs group">
@@ -477,14 +503,20 @@ export function BrandSetup() {
                 <div className="text-sm font-medium break-words">{analysisResult.brandPersonality}</div>
               </div>
               <div className="col-span-full">
-                <div className="text-xs text-gray-500 mb-2">Extracted Colors</div>
+                <div className="text-xs text-gray-500 mb-2">Brand Colors</div>
                 <div className="flex flex-wrap gap-4">
-                  {analysisResult.brandColors?.map((color: string, i: number) => (
-                    <div key={i} className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs">
-                      <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm shrink-0" style={{ backgroundColor: color }} />
-                      <span className="text-xs font-mono text-gray-600">{color}</span>
-                    </div>
-                  ))}
+                  <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs">
+                    <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm shrink-0" style={{ backgroundColor: analysisResult.primaryColor }} />
+                    <span className="text-xs font-mono text-gray-600">{analysisResult.primaryColor} (Primary)</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs">
+                    <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm shrink-0" style={{ backgroundColor: analysisResult.secondaryColor }} />
+                    <span className="text-xs font-mono text-gray-600">{analysisResult.secondaryColor} (Secondary)</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border border-gray-200 shadow-xs">
+                    <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm shrink-0" style={{ backgroundColor: analysisResult.accentColor }} />
+                    <span className="text-xs font-mono text-gray-600">{analysisResult.accentColor} (Accent)</span>
+                  </div>
                 </div>
               </div>
             </div>
