@@ -33,13 +33,15 @@ export function ContentGenerator() {
   const [generatedContent, setGeneratedContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [generatedMediaUrl, setGeneratedMediaUrl] = useState('');
+  const [videoDownloadLink, setVideoDownloadLink] = useState('');
   
   const [scheduling, setScheduling] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduledDate, setScheduledDate] = useState(() => {
     const date = new Date();
     date.setDate(date.getDate() + 1);
     date.setHours(10, 0, 0, 0);
-    return date.toISOString().slice(0, 16); // Format for datetime-local input
+    return date.toISOString().slice(0, 16);
   });
   const [planning, setPlanning] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -102,9 +104,9 @@ export function ContentGenerator() {
 
   useEffect(() => {
     if (mediaType === 'image') {
-      setSelectedModel('gemini-3-pro-image-preview');
+      setSelectedModel('gemini-3.1-flash-image-preview');
     } else if (mediaType === 'video') {
-      setSelectedModel('veo-3.1-fast-generate-preview');
+      setSelectedModel('gemini-3-pro-image-preview');
     }
   }, [mediaType]);
 
@@ -247,12 +249,13 @@ export function ContentGenerator() {
     if (!generatedContent) return;
     
     setScheduling(true);
+    console.log("Scheduling post...", { generatedContent, mediaType, generatedMediaUrl });
     try {
       const scheduleTime = new Date(scheduledDate);
       const status = brand.automationSettings?.mode === 'auto' ? 'scheduled' : 'suggested';
 
       try {
-        await addDoc(collection(db, 'posts'), {
+        const postData = {
           userId: auth.currentUser?.uid,
           brandId: brand.id,
           content: generatedContent,
@@ -263,8 +266,12 @@ export function ContentGenerator() {
           platforms: selectedPlatforms,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
-        });
+        };
+        console.log("Saving post to Firestore:", postData);
+        await addDoc(collection(db, 'posts'), postData);
+        console.log("Post saved successfully.");
       } catch (error) {
+        console.error("Firestore error:", error);
         handleFirestoreError(error, OperationType.CREATE, 'posts');
       }
 
@@ -272,7 +279,7 @@ export function ContentGenerator() {
       navigate('/schedule');
     } catch (error) {
       console.error("Scheduling failed:", error);
-      alert("Failed to schedule post.");
+      alert("Failed to schedule post: " + (error instanceof Error ? error.message : String(error)));
     } finally {
       setScheduling(false);
     }
@@ -574,19 +581,6 @@ export function ContentGenerator() {
           ) : (
             <div className="flex-1 flex flex-col">
               <div className="space-y-4 mb-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Schedule Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none bg-white"
-                  />
-                </div>
-
                 <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex-1">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -615,33 +609,56 @@ export function ContentGenerator() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all resize-none mb-4"
                     />
                   ) : (
-                    <div className="text-sm text-gray-800 whitespace-pre-wrap mb-4">
+                    <div className="text-sm text-gray-800 whitespace-pre-wrap mb-4 bg-gray-100 p-4 rounded-xl">
                       {generatedContent}
                     </div>
                   )}
 
                   {generatedMediaUrl && mediaType === 'image' && (
-                    <img src={generatedMediaUrl} alt="Generated content" className="w-full rounded-lg border border-gray-100" />
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <img src={generatedMediaUrl} alt="Generated content" className="w-full h-64 object-cover" />
+                    </div>
                   )}
                   
                   {generatedMediaUrl && mediaType === 'video' && (
-                    <video src={generatedMediaUrl} controls className="w-full rounded-lg border border-gray-100" />
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <video src={generatedMediaUrl} controls className="w-full h-64 object-cover" />
+                    </div>
                   )}
                 </div>
               </div>
 
               <button
-                onClick={handleSchedule}
+                onClick={() => setShowScheduleModal(true)}
                 disabled={scheduling}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 {scheduling ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calendar className="w-5 h-5" />}
-                {scheduling 
-                  ? 'Processing...' 
-                  : brand.automationSettings?.mode === 'auto' 
-                    ? 'Schedule Post' 
-                    : 'Save for Approval'}
+                {brand.automationSettings?.mode === 'auto' 
+                  ? 'Schedule Post' 
+                  : 'Save for Approval'}
               </button>
+              
+              {showScheduleModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
+                    <h3 className="font-semibold text-lg">Schedule Post</h3>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">Select Date & Time</label>
+                      <input
+                        type="datetime-local"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black outline-none"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <button onClick={() => setShowScheduleModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium">Cancel</button>
+                      <button onClick={() => { handleSchedule(); setShowScheduleModal(false); }} className="flex-1 px-4 py-2 bg-black text-white rounded-lg text-sm font-medium">Confirm</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <button
                 onClick={async () => {
