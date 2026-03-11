@@ -28,6 +28,9 @@
         "industry": { "type": "string", "description": "The industry the business belongs to." },
         "category": { "type": "string", "description": "The specific category of the business." },
         "logoUrl": { "type": "string", "description": "URL or base64 data of the brand logo." },
+        "primaryColor": { "type": "string", "description": "Primary brand color (hex code)." },
+        "secondaryColor": { "type": "string", "description": "Secondary brand color (hex code)." },
+        "accentColor": { "type": "string", "description": "Accent brand color (hex code)." },
         "brandColors": { "type": "array", "items": { "type": "string" }, "description": "AI-extracted brand colors (hex codes)." },
         "automationSettings": {
           "type": "object",

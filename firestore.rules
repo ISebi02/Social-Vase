@@ -67,7 +67,7 @@ service cloud.firestore {
     }
 
     function isValidBrand(data) {
-      return hasOnlyAllowedFields(['userId', 'name', 'websiteUrl', 'socialUrls', 'guidelinesText', 'brandTone', 'brandPersonality', 'brandColors', 'automationSettings', 'clientInquiries', 'suggestedTopics', 'createdAt', 'updatedAt', 'industry', 'category', 'logoUrl']) &&
+      return hasOnlyAllowedFields(['userId', 'name', 'websiteUrl', 'socialUrls', 'guidelinesText', 'brandTone', 'brandPersonality', 'brandColors', 'automationSettings', 'clientInquiries', 'suggestedTopics', 'createdAt', 'updatedAt', 'industry', 'category', 'logoUrl', 'primaryColor', 'secondaryColor', 'accentColor']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              (!('websiteUrl' in data) || (data.websiteUrl is string && data.websiteUrl.size() <= 1000)) &&
@@ -76,6 +76,9 @@ service cloud.firestore {
              (!('brandTone' in data) || (data.brandTone is string && data.brandTone.size() <= 1000)) &&
              (!('brandPersonality' in data) || (data.brandPersonality is string && data.brandPersonality.size() <= 1000)) &&
              (!('brandColors' in data) || (data.brandColors is list && data.brandColors.size() <= 20)) &&
+             (!('primaryColor' in data) || (data.primaryColor is string && data.primaryColor.size() <= 50)) &&
+             (!('secondaryColor' in data) || (data.secondaryColor is string && data.secondaryColor.size() <= 50)) &&
+             (!('accentColor' in data) || (data.accentColor is string && data.accentColor.size() <= 50)) &&
              (!('automationSettings' in data) || (
                data.automationSettings is map &&
                data.automationSettings.mode in ['manual', 'auto'] &&

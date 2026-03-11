@@ -54,8 +54,10 @@ export function BrandSetup() {
       if (brandId) {
         try {
           const brandDoc = await getDoc(doc(db, 'brands', brandId));
+          console.log("Brand doc exists:", brandDoc.exists());
           if (brandDoc.exists()) {
             const data = brandDoc.data();
+            console.log("Brand data:", data);
             // Ensure the brand belongs to the current user
             if (data.userId !== auth.currentUser.uid) {
               navigate('/brands');
