@@ -38,7 +38,7 @@ SocialVase is an open-source, AI-driven content creation and social media manage
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/Docwaltt/Social-Vase.git
+git clone https://github.com/yourusername/socialvase.git
 cd socialvase
 ```
 
@@ -57,6 +57,30 @@ npm run dev
 
 **5. Add your API Keys**
 Open `http://localhost:3000` (or the port shown in your terminal), navigate to the **Integrations** page, and securely input your Gemini and social media API keys.
+
+---
+
+## 🚀 Deployment & Automated Posting (Vercel)
+
+SocialVase uses Vercel Cron to automatically publish your scheduled posts in the background without needing a dedicated 24/7 backend. Because cron jobs run on the server, you need to provide your API keys to Vercel via Environment Variables.
+
+**1. Deploy to Vercel:**
+Click "Deploy to Vercel" or link your GitHub repository. Vercel will automatically detect the Vite app and Serverless functions inside the `api/` directory.
+
+**2. Configure Environment Variables in Vercel:**
+To enable automated publishing via Cron, add the following to your Vercel Project Settings > Environment Variables:
+
+*   **Firebase Admin Credentials:**
+    *   `FIREBASE_SERVICE_ACCOUNT_JSON`: Your Firebase Service Account JSON stringified.
+*   **Social Media Tokens (for background posting):**
+    *   `TWITTER_API_KEY`: Your Twitter/X API Key.
+    *   `LINKEDIN_ACCESS_TOKEN`: Your LinkedIn token.
+    *   *(Note: The `Integrations` page in the app stores keys locally for manual usage, but Cron needs server access via these Vercel env vars).*
+*   **Cron Security:**
+    *   `CRON_SECRET`: A secure random string. (Vercel uses this automatically to verify cron requests are valid).
+
+**3. Vercel Cron:**
+The `vercel.json` file in this repository is already configured to ping `/api/cron` every 15 minutes. It will automatically check for scheduled posts and publish them!
 
 ---
 
