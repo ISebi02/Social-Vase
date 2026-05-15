@@ -16,6 +16,8 @@ import { ContentGenerator } from './pages/ContentGenerator';
 import { Scheduler } from './pages/Scheduler';
 import { Analytics } from './pages/Analytics';
 
+import { Integrations } from './pages/Integrations';
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -37,6 +39,7 @@ export default function App() {
             <Route path="/generate" element={<ContentGenerator />} />
             <Route path="/schedule" element={<Scheduler />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/integrations" element={<Integrations />} />
           </Route>
         </Routes>
       </Router>

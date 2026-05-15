@@ -25,7 +25,6 @@ export function ContentGenerator() {
   const [quality, setQuality] = useState('1K');
   const [videoResolution, setVideoResolution] = useState('720p');
   const [selectedModel, setSelectedModel] = useState('');
-  const [hasApiKey, setHasApiKey] = useState(false);
   
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['twitter', 'linkedin']);
   
@@ -88,18 +87,6 @@ export function ContentGenerator() {
     };
 
     fetchBrand();
-  }, []);
-
-  useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(hasKey);
-      }
-    };
-    checkApiKey();
-    const interval = setInterval(checkApiKey, 2000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -180,14 +167,11 @@ export function ContentGenerator() {
       return;
     }
 
-    // Check for API key if using image/video models
-    if (mediaType === 'image' || mediaType === 'video') {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        alert("Please select a paid API key to generate images or videos.");
-        await window.aistudio.openSelectKey();
-        return;
-      }
+    // Check for API key
+    if (!localStorage.getItem('gemini_api_key')) {
+      alert("Please set your Gemini API key in the Integrations page to generate content.");
+      navigate('/integrations');
+      return;
     }
 
     setGenerating(true);
@@ -500,14 +484,6 @@ export function ContentGenerator() {
                       </>
                     )}
                   </select>
-                  {!hasApiKey && (
-                    <button
-                      onClick={() => window.aistudio?.openSelectKey()}
-                      className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      {mediaType === 'video' ? 'Video' : 'Select Key'}
-                    </button>
-                  )}
                 </div>
               </div>
 

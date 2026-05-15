@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { auth, logout } from '../firebase';
-import { LogOut, LayoutDashboard, Settings, PenTool, Calendar, BarChart3, Menu, X, ChevronLeft, ChevronRight, Briefcase, User } from 'lucide-react';
+import { LogOut, LayoutDashboard, Settings, PenTool, Calendar, BarChart3, Menu, X, ChevronLeft, ChevronRight, Briefcase, User, Plug } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState, useEffect } from 'react';
 
@@ -21,6 +21,7 @@ export function Layout() {
     { name: 'Content Generator', path: '/generate', icon: PenTool },
     { name: 'Scheduler', path: '/schedule', icon: Calendar },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { name: 'Integrations', path: '/integrations', icon: Plug },
     { name: 'Profile', path: '/profile', icon: User },
   ];
 

@@ -1,16 +1,7 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 
-declare global {
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
-
 const getApiKey = () => {
-  return (process.env.GEMINI_API_KEY || process.env.API_KEY) as string;
+  return localStorage.getItem('gemini_api_key') as string;
 };
 
 export const fetchSuggestions = async (brandData: any, query?: string) => {
@@ -112,16 +103,8 @@ export const generateContent = async (params: {
 }) => {
   const { finalTopic, isTrend, brand, selectedPlatforms, mediaType, aspectRatio, quality, videoResolution, modelName } = params;
   
-  // Check if API key is needed for image/video
-  if (mediaType === 'image' || mediaType === 'video') {
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-      // We'll let the UI handle the prompt if possible, but keep this as a safety
-      await window.aistudio.openSelectKey();
-    }
-  }
-
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API Key missing. Please select a model/key first.");
+  if (!apiKey) throw new Error("API Key missing. Please set your API key in the Integrations page.");
   
   const ai = new GoogleGenAI({ apiKey });
   

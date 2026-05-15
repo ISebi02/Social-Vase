@@ -386,23 +386,19 @@ export function BrandSetup() {
           </div>
         </div>
 
-        {/* Guidelines */}
+        {/* Connected Accounts */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold border-b border-gray-100 pb-2">Connected Accounts</h2>
-          <div className="flex gap-2">
-            {['twitter', 'linkedin', 'facebook', 'instagram'].map(platform => (
-              <button
-                key={platform}
-                onClick={async () => {
-                  const res = await fetch(`/api/auth/url/${platform}`);
-                  const { url } = await res.json();
-                  window.open(url, 'oauth_popup', 'width=600,height=700');
-                }}
-                className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800"
-              >
-                Connect {platform.charAt(0).toUpperCase() + platform.slice(1)}
-              </button>
-            ))}
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
+            <p className="text-sm text-blue-800 mb-3">
+              SocialVase is now open-source. For enhanced security, you bring your own API keys to post content directly on social platforms.
+            </p>
+            <button
+              onClick={() => navigate('/integrations')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+            >
+              Configure API Keys in Integrations
+            </button>
           </div>
 
           <h2 className="text-lg font-semibold border-b border-gray-100 pb-2 mt-8">Brand Visuals & Guidelines</h2>

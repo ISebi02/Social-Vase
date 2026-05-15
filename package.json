@@ -1,8 +1,18 @@
 {
-  "name": "react-example",
+  "name": "socialvase",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "keywords": [
+    "ai",
+    "social-media-management",
+    "generative-ai",
+    "content-automation",
+    "content-creation",
+    "gemini-api",
+    "scheduling",
+    "brand-management"
+  ],
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node server.ts",
