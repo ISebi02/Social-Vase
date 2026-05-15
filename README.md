@@ -38,7 +38,7 @@ SocialVase is an open-source, AI-driven content creation and social media manage
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/socialvase.git
+git clone https://github.com/Docwaltt/Social-Vase.git
 cd socialvase
 ```
 
