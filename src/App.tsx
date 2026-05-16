@@ -4,6 +4,7 @@
  */
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -43,6 +44,7 @@ export default function App() {
           </Route>
         </Routes>
       </Router>
+      <VercelAnalytics />
     </ErrorBoundary>
   );
 }
