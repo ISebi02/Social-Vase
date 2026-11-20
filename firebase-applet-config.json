@@ -3,7 +3,7 @@
   "appId": "1:212116872890:web:6c020dfd9adb813d196c83",
   "apiKey": "AIzaSyCpmKAj0X_gEUU2Uetr7KEzkeA2BlNSr5Y",
   "authDomain": "memoflow-ea7fb.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-52856401-2edc-4649-b8d5-18f520ae0aea",
+  "firestoreDatabaseId": "(default)",
   "storageBucket": "memoflow-ea7fb.firebasestorage.app",
   "messagingSenderId": "212116872890",
   "measurementId": "G-1VXDKK2H0G"
