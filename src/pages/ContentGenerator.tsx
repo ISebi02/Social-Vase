@@ -104,7 +104,7 @@ export function ContentGenerator() {
       setSuggestions(result);
     } catch (error: any) {
       console.error("Error fetching suggestions:", error);
-      alert(error.message || "Failed to fetch trending topics. Please try again.");
+      console.warn("Trending topics unavailable (Gemini quota or network):", error);
       setSuggestions([]);
     } finally {
       setFetchingSuggestions(false);
